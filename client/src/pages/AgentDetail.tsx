@@ -235,13 +235,33 @@ export default function AgentDetail() {
               <p className="text-sm text-muted-foreground">No subagents.</p>
             ) : (
               <div className="space-y-2">
-                {subagents.map((s) => (
-                  <div key={s.id} className="border border-input p-3">
-                    <div className="font-mono text-sm font-semibold">{s.name}</div>
-                    <p className="text-xs text-muted-foreground">{s.description}</p>
-                    {s.model && <Tag variant="muted" className="mt-2">{s.model}</Tag>}
-                  </div>
-                ))}
+                {subagents.map((s) => {
+                  const subagentTools = (s.tools as string[]) ?? [];
+                  return (
+                    <div key={s.id} className="border border-input p-3">
+                      <div className="font-mono text-sm font-semibold">{s.name}</div>
+                      <p className="text-xs text-muted-foreground">{s.description}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="mono-label text-muted-foreground">Model</span>
+                        {s.model ? (
+                          <Tag variant="muted">{s.model}</Tag>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Inherits orchestrator</span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="mono-label text-muted-foreground">Tools</span>
+                        {subagentTools.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">All orchestrator tools</span>
+                        ) : (
+                          subagentTools.map((slug) => (
+                            <Tag key={slug} variant="outline">{slug}</Tag>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Panel>

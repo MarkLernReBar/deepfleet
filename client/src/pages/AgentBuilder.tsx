@@ -91,6 +91,15 @@ export default function AgentBuilder() {
 
   const toggleTool = (id: number) => setToolIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
+  const toggleSubagentTool = (index: number, slug: string) =>
+    setSubagents((p) =>
+      p.map((s, j) =>
+        j === index
+          ? { ...s, tools: s.tools.includes(slug) ? s.tools.filter((x) => x !== slug) : [...s.tools, slug] }
+          : s
+      )
+    );
+
   const submit = () => {
     if (!fleetId) return toast.error("Select a fleet");
     if (!name.trim()) return toast.error("Name is required");
@@ -296,6 +305,50 @@ export default function AgentBuilder() {
                   <Input value={s.description} onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} placeholder="description" className="border-2 border-foreground" />
                 </div>
                 <Textarea value={s.prompt} onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, prompt: e.target.value } : x)))} placeholder="subagent prompt" rows={3} className="mt-3 border-2 border-foreground font-mono text-sm" />
+                <div className="mt-3">
+                  <Eyebrow className="mb-1.5">Model</Eyebrow>
+                  <Input
+                    value={s.model}
+                    onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)))}
+                    placeholder="Inherit orchestrator model (leave empty)"
+                    className="border-2 border-foreground font-mono"
+                  />
+                </div>
+                <div className="mt-3">
+                  <Eyebrow className="mb-1.5">Tools</Eyebrow>
+                  {(tools?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">No tools available. Add tools in the Tools & MCP catalog.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {tools!.map((t) => {
+                        const on = s.tools.includes(t.slug);
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => toggleSubagentTool(i, t.slug)}
+                            className={cn("press flex items-start gap-3 border-2 p-3 text-left", on ? "border-foreground bg-muted" : "border-input")}
+                          >
+                            <div className={cn("mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border-2 border-foreground", on && "bg-foreground")}>
+                              {on && <Check className="h-3 w-3 text-background" />}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-semibold">{t.slug}</span>
+                                {t.requiresApproval && <span className="mono-label border border-foreground px-1">approval</span>}
+                                {t.type === "mcp" && <span className="mono-label bg-foreground px-1 text-background">mcp</span>}
+                              </div>
+                              <p className="truncate text-xs text-muted-foreground">{t.description}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Leave model empty to use the orchestrator&apos;s model. Tools restrict what this subagent can call.
+                </p>
               </Panel>
             ))}
           </div>
