@@ -14,4 +14,9 @@ export const ENV = {
   langsmithOrg: process.env.LANGSMITH_ORG ?? "",
   langsmithProject: process.env.LANGSMITH_PROJECT ?? "",
   langsmithHost: process.env.LANGSMITH_HOST ?? "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  slackClientId: process.env.SLACK_CLIENT_ID ?? "",
+  slackClientSecret: process.env.SLACK_CLIENT_SECRET ?? "",
+  appBaseUrl: process.env.APP_BASE_URL ?? "",
 };

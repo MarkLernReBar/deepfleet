@@ -65,6 +65,18 @@ def _extract_tool_output(output: Any) -> str:
     return _as_text(output)
 
 
+def _current_langsmith_run_id() -> str | None:
+    try:
+        from langsmith.run_helpers import get_current_run_tree
+
+        tree = get_current_run_tree()
+        if tree and tree.id:
+            return str(tree.id)
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 async def stream_agent_events(agent, user_input: str) -> AsyncIterator[dict[str, Any]]:
     """Run the agent and yield DeepFleet step events as dicts.
 
@@ -135,4 +147,11 @@ async def stream_agent_events(agent, user_input: str) -> AsyncIterator[dict[str,
             if text:
                 final_message = text
 
-    yield {"type": "message", "content": {"message": final_message}, "final": True}
+    yield {
+        "type": "message",
+        "content": {
+            "message": final_message,
+            "langsmith_run_id": _current_langsmith_run_id(),
+        },
+        "final": True,
+    }

@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-06-23T18:50:00Z	frame	Phase 4 scoped to langsmith worker id OAuth connect and MCP catalog tools; defer editable graph to Phase 5	Phases 1-3 merged; remaining gaps are integration and observability not UI graph editing	docs/plans/fleet-parity-phase-4.md	scoped
+2026-06-23T18:50:00Z	frame	Done predicate requires pnpm check test build plus verifiable OAuth and langsmith paths	prove-it-works requires falsifiable checks not self-report	docs/plans/fleet-parity-phase-4.md	scoped
+2026-06-23T18:50:00Z	design	Sequence riskiest-first: worker trace id then catalog then OAuth then UI	Riskiest unknown is LangSmith run id capture from deepagents stream	work/fleet-parity-phase-4-decisions.tsv	designed
+2026-06-23T18:52:00Z	worker	Added langsmith_run_id to worker done SSE via get_current_run_tree	Server workerBridge already persists field when present	worker/deepfleet_worker/streaming.py,VERIFIED
+2026-06-23T18:53:00Z	catalog	Seeded 5 first-party MCP tools gmail slack tavily calendar	Fleet toolbox parity without full MCP servers yet	shared/catalog.ts,server/seed.ts,VERIFIED
+2026-06-23T18:54:00Z	oauth	Added Google and Slack OAuth start/callback routes with JWT state	Channel connect requires server env credentials	server/integrations.ts,VERIFIED
+2026-06-23T18:55:00Z	ui	Connect buttons on Channels tab gated by fleet.integrations.status	Redirects back to agent channels after OAuth	client/src/pages/AgentDetail.tsx,VERIFIED
+2026-06-23T18:56:00Z	verify	pnpm check test build all pass before commit	prove-it-works on real commands	pnpm test 19 passed,VERIFIED

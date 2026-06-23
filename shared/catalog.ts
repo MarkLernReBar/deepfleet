@@ -61,6 +61,49 @@ export const BUILTIN_TOOLS: BuiltinToolSeed[] = [
   { name: "SQL Query", slug: "run_query", description: "Run a read-only SQL query against a connected database.", requiresApproval: false },
 ];
 
+export type FirstPartyIntegrationToolSeed = BuiltinToolSeed & {
+  config: Record<string, string>;
+};
+
+/** LangSmith Fleet first-party MCP-style tools (require OAuth credentials at runtime). */
+export const FIRST_PARTY_INTEGRATION_TOOLS: FirstPartyIntegrationToolSeed[] = [
+  {
+    name: "Gmail Read",
+    slug: "gmail_read",
+    description: "Read messages from a connected Gmail inbox.",
+    requiresApproval: false,
+    config: { provider: "gmail", integration: "first_party" },
+  },
+  {
+    name: "Gmail Send",
+    slug: "gmail_send",
+    description: "Send email via a connected Gmail account.",
+    requiresApproval: true,
+    config: { provider: "gmail", integration: "first_party" },
+  },
+  {
+    name: "Slack Post",
+    slug: "slack_post",
+    description: "Post a message to a Slack channel using a connected workspace token.",
+    requiresApproval: true,
+    config: { provider: "slack", integration: "first_party" },
+  },
+  {
+    name: "Tavily Search",
+    slug: "tavily_search",
+    description: "Search the web via Tavily (requires Tavily API credential).",
+    requiresApproval: false,
+    config: { provider: "tavily", integration: "first_party" },
+  },
+  {
+    name: "Google Calendar",
+    slug: "google_calendar",
+    description: "List and create calendar events via Google Calendar API.",
+    requiresApproval: true,
+    config: { provider: "google_calendar", integration: "first_party" },
+  },
+];
+
 export const HARNESS_DEFAULTS = {
   planning: true,
   filesystem: true,

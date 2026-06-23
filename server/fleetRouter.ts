@@ -35,6 +35,14 @@ const skillSlugSchema = z
   .refine(isValidSkillSlug, { message: "Slug must be lowercase alphanumeric with hyphens only" });
 
 export const fleetRouter = router({
+  /* --------------------------- Integrations ------------------------- */
+  integrations: router({
+    status: protectedProcedure.query(() => ({
+      google: Boolean(ENV.googleClientId && ENV.googleClientSecret),
+      slack: Boolean(ENV.slackClientId && ENV.slackClientSecret),
+    })),
+  }),
+
   /* --------------------------- Run engine --------------------------- */
   engine: router({
     // Reports which run engine is active: the real deepagents harness worker

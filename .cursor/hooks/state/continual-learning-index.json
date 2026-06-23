@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "transcripts": {
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/4d10a41d-9e66-44d3-92de-1704ccc2f809/4d10a41d-9e66-44d3-92de-1704ccc2f809.jsonl": {
+      "mtimeMs": 1782226692284
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/7f73e36c-46f1-496f-b4c3-220f4d0e81c7.jsonl": {
+      "mtimeMs": 1782240230777
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/0cc5b051-04fb-45b8-8f50-205b3672236e.jsonl": {
+      "mtimeMs": 1782238899523
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/3eba92e5-0af9-48f6-a0e4-2abc9bad9447.jsonl": {
+      "mtimeMs": 1782238767578
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/4d10a41d-9e66-44d3-92de-1704ccc2f809.jsonl": {
+      "mtimeMs": 1782226677051
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/53d9b04e-8087-44d8-9ddf-a15e228eb777.jsonl": {
+      "mtimeMs": 1782238996275
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/62e99798-614b-4bd2-95ef-a558a8f25ea8.jsonl": {
+      "mtimeMs": 1782239247273
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/8fbcfeef-40ed-4043-b7cf-5ea2c7bd42a7.jsonl": {
+      "mtimeMs": 1782238825051
+    },
+    "/Users/marklerner/.cursor/projects/Users-marklerner-Open-Source-Platform-for-Managing-DeepAgent-Fleets/agent-transcripts/7f73e36c-46f1-496f-b4c3-220f4d0e81c7/subagents/cdd28134-a5cf-4971-9641-4a12fd9fc49c.jsonl": {
+      "mtimeMs": 1782240273488
+    }
+  },
+  "processedAtMs": 1782240304232
+}

@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { Eyebrow, Panel, PageHeader, IdentityTag, StatusTag, Tag, EmptyBlock } from "@/components/brutal";
-import { useLocation, useRoute, Link } from "wouter";
+import { useLocation, useRoute, Link, useSearch } from "wouter";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -60,6 +60,10 @@ export default function AgentDetail() {
   const { data: creds } = trpc.fleet.credentials.list.useQuery();
   const { data: schedules } = trpc.fleet.schedules.list.useQuery({ agentId: id }, { enabled: !!id });
   const { data: channels } = trpc.fleet.channels.list.useQuery({ agentId: id }, { enabled: !!id });
+  const { data: integrationStatus } = trpc.fleet.integrations.status.useQuery();
+
+  const search = useSearch();
+  const tabParam = new URLSearchParams(search).get("tab");
 
   const [tab, setTab] = useState<TabId>("overview");
   const [runOpen, setRunOpen] = useState(false);
@@ -136,6 +140,12 @@ export default function AgentDetail() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  useEffect(() => {
+    if (!tabParam) return;
+    const allowed: TabId[] = ["overview", "graph", "memory", "tools", "schedules", "channels", "sharing", "code"];
+    if (allowed.includes(tabParam as TabId)) setTab(tabParam as TabId);
+  }, [tabParam]);
 
   useEffect(() => {
     if (memoryDirty || !data?.agent) return;
@@ -226,6 +236,18 @@ export default function AgentDetail() {
 
   const credsForProvider = (provider: string) =>
     creds?.filter((c) => c.provider === provider || (provider === "gmail" && c.provider === "google")) ?? [];
+
+  const connectChannel = (type: "slack" | "gmail") => {
+    const ok = type === "gmail" ? integrationStatus?.google : integrationStatus?.slack;
+    if (!ok) {
+      return toast.error(
+        type === "gmail"
+          ? "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server"
+          : "Set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET on the server"
+      );
+    }
+    window.location.href = `/api/integrations/${type === "gmail" ? "google" : "slack"}/start?agentId=${id}`;
+  };
 
   const submitSchedule = () => {
     if (!scheduleForm.name.trim() || !scheduleForm.cronExpression.trim() || !scheduleForm.prompt.trim()) {
@@ -565,6 +587,14 @@ export default function AgentDetail() {
               {(ch.type === "slack" || ch.type === "gmail") && (
                 <div className="mt-4 space-y-2 border-t border-input pt-4">
                   <Eyebrow>Credential</Eyebrow>
+                  {!channelConfig(ch.type).credentialId && (
+                    <button
+                      onClick={() => connectChannel(ch.type)}
+                      className="press mb-2 w-full bg-foreground py-2 text-background mono-label text-sm"
+                    >
+                      Connect {ch.label}
+                    </button>
+                  )}
                   <Select
                     value={channelConfig(ch.type).credentialId ? String(channelConfig(ch.type).credentialId) : ""}
                     onValueChange={(v) => setChannelCredential(ch.type, v)}

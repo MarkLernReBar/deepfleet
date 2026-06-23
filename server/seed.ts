@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import * as db from "./db";
 import { tools as toolsTable } from "../drizzle/schema";
-import { BUILTIN_TOOLS, HARNESS_DEFAULTS, estimateCostMicroUsd } from "../shared/catalog";
+import { BUILTIN_TOOLS, FIRST_PARTY_INTEGRATION_TOOLS, HARNESS_DEFAULTS, estimateCostMicroUsd } from "../shared/catalog";
 
 /**
  * Seed the builtin tool catalog. Idempotent — only inserts tools whose slug
@@ -21,6 +21,20 @@ export async function seedBuiltinTools(userId: number): Promise<{ inserted: numb
       slug: t.slug,
       description: t.description,
       type: "builtin",
+      requiresApproval: t.requiresApproval,
+      isAvailable: true,
+      createdBy: userId,
+    });
+    inserted++;
+  }
+  for (const t of FIRST_PARTY_INTEGRATION_TOOLS) {
+    if (have.has(t.slug)) continue;
+    await db.createTool({
+      name: t.name,
+      slug: t.slug,
+      description: t.description,
+      type: "mcp",
+      config: t.config,
       requiresApproval: t.requiresApproval,
       isAvailable: true,
       createdBy: userId,
