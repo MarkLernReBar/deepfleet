@@ -11,4 +11,7 @@ export const ENV = {
   // dispatched to it and real create_deep_agent() steps are streamed back.
   workerUrl: process.env.WORKER_URL ?? "",
   workerToken: process.env.WORKER_TOKEN ?? "",
+  langsmithOrg: process.env.LANGSMITH_ORG ?? "",
+  langsmithProject: process.env.LANGSMITH_PROJECT ?? "",
+  langsmithHost: process.env.LANGSMITH_HOST ?? "",
 };

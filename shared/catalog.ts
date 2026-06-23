@@ -72,5 +72,16 @@ export const HARNESS_DEFAULTS = {
 export const SHARE_ROLES = ["viewer", "can-run", "can-edit", "can-clone", "owner"] as const;
 export type ShareRole = (typeof SHARE_ROLES)[number];
 
+export const CREDENTIAL_PROVIDERS = [
+  { id: "openai", label: "OpenAI" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "google", label: "Google" },
+  { id: "gmail", label: "Gmail" },
+  { id: "google_calendar", label: "Google Calendar" },
+  { id: "slack", label: "Slack" },
+  { id: "tavily", label: "Tavily" },
+  { id: "custom", label: "Custom" },
+] as const;
+
 export const STEP_TYPES = ["plan", "tool_call", "tool_result", "subagent", "message"] as const;
 export type StepType = (typeof STEP_TYPES)[number];

@@ -61,7 +61,9 @@ Phase 1: subagent model/tools UI, workspace skills, custom model registry, AGENT
 
 Phase 2: cron schedules + pause triggers, channels (chat/Slack/Gmail stubs), threaded chat at `/chat`.
 
-Plan docs: [docs/plans/fleet-parity-phase-1.md](./docs/plans/fleet-parity-phase-1.md), [docs/plans/fleet-parity-phase-2.md](./docs/plans/fleet-parity-phase-2.md).
+Phase 3: templates gallery, agent graph view, LangSmith trace links, channel credential wiring.
+
+Plan docs: [docs/plans/fleet-parity-phase-1.md](./docs/plans/fleet-parity-phase-1.md), [docs/plans/fleet-parity-phase-2.md](./docs/plans/fleet-parity-phase-2.md), [docs/plans/fleet-parity-phase-3.md](./docs/plans/fleet-parity-phase-3.md).
 
 ## Environment
 

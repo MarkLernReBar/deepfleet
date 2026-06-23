@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Check,
   X,
+  ExternalLink,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,6 +95,7 @@ export default function RunTrace() {
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.fleet.runs.get.useQuery({ id }, { enabled: !!id, refetchInterval: false });
+  const { data: langsmith } = trpc.fleet.runs.langsmithUrl.useQuery({ id }, { enabled: !!id });
   const { data: agentData } = trpc.fleet.agents.get.useQuery(
     { id: data?.run.agentId ?? 0 },
     { enabled: !!data?.run.agentId }
@@ -173,6 +175,19 @@ export default function RunTrace() {
             {run.model && <Tag variant="muted">{run.model}</Tag>}
             <Tag variant="muted">{run.totalTokens.toLocaleString()} tok</Tag>
             <Tag variant="muted">${cost}</Tag>
+            {langsmith?.url && (
+              <a
+                href={langsmith.url}
+                target="_blank"
+                rel="noreferrer"
+                className="press inline-flex items-center gap-1 border-2 border-foreground px-2 py-0.5 mono-label text-[0.65rem] hover:bg-muted"
+              >
+                LangSmith <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {run.langsmithRunId && !langsmith?.url && (
+              <Tag variant="outline">trace: {run.langsmithRunId}</Tag>
+            )}
           </div>
         </div>
         {!streaming && (
