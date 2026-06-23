@@ -3,6 +3,7 @@ import {
   createRunStep,
   getAgent,
   getAgentTools,
+  getCustomModelByModelId,
   getRun,
   getSubagents,
   updateRun,
@@ -52,12 +53,28 @@ async function buildSpec(agentId: number, input: string) {
 
   const model = toProviderModelString(agent.modelProvider as ModelProvider, agent.model);
 
+  // When the agent uses a workspace-registered custom model, pass endpoint metadata
+  // so the worker can route via an OpenAI-compatible gateway. Without a registry
+  // match the worker falls back to resolve_model() with the custom:modelId string.
+  let custom_model_config: { base_url: string; api_key_env: string; model_id: string } | undefined;
+  if (agent.modelProvider === "custom") {
+    const row = await getCustomModelByModelId(agent.model);
+    if (row) {
+      custom_model_config = {
+        base_url: row.baseUrl,
+        api_key_env: row.apiKeyEnvVar,
+        model_id: row.modelId,
+      };
+    }
+  }
+
   return {
     agent,
     payload: {
       run_id: undefined as number | undefined,
       name: agent.name,
       model,
+      ...(custom_model_config ? { custom_model_config } : {}),
       system_prompt: agent.systemPrompt ?? "",
       tools,
       approval_tools: approvalTools,

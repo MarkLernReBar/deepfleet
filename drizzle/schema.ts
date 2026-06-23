@@ -338,3 +338,27 @@ export const approvals = mysqlTable(
 
 export type Approval = typeof approvals.$inferSelect;
 export type InsertApproval = typeof approvals.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Custom models — workspace-registered LLM endpoints                  */
+/* ------------------------------------------------------------------ */
+export const customModels = mysqlTable(
+  "customModels",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    // id passed to the LLM API, e.g. deepseek/deepseek-v4-pro
+    modelId: varchar("modelId", { length: 160 }).notNull().unique(),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    baseUrl: varchar("baseUrl", { length: 512 }).notNull(),
+    // name of env var holding the API key — never store the secret itself
+    apiKeyEnvVar: varchar("apiKeyEnvVar", { length: 120 }).notNull(),
+    provider: varchar("provider", { length: 80 }).notNull(),
+    createdBy: int("createdBy").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({ creatorIdx: index("custommodels_creator_idx").on(t.createdBy) })
+);
+
+export type CustomModel = typeof customModels.$inferSelect;
+export type InsertCustomModel = typeof customModels.$inferInsert;

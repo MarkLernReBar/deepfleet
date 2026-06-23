@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { isValidSkillSlug } from "./skills";
+import { isValidModelId } from "./customModels";
 import { generateAgentCode } from "./codeExport";
 import { SHARE_ROLES } from "../shared/catalog";
 import { isWorkerConfigured, workerHealthy } from "./workerBridge";
@@ -328,6 +329,37 @@ export const fleetRouter = router({
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteCredential(input.id);
+      return { success: true };
+    }),
+  }),
+
+  /* ------------------------- Custom models -------------------------- */
+  customModels: router({
+    list: protectedProcedure.query(() => db.listCustomModels()),
+    create: protectedProcedure
+      .input(
+        z.object({
+          modelId: z.string().refine(isValidModelId, { message: "modelId is required" }),
+          displayName: z.string().min(1),
+          baseUrl: z.string().url(),
+          apiKeyEnvVar: z.string().min(1),
+          provider: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getCustomModelByModelId(input.modelId.trim());
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "modelId already registered" });
+        return db.createCustomModel({
+          modelId: input.modelId.trim(),
+          displayName: input.displayName,
+          baseUrl: input.baseUrl,
+          apiKeyEnvVar: input.apiKeyEnvVar,
+          provider: input.provider,
+          createdBy: ctx.user.id,
+        });
+      }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteCustomModel(input.id);
       return { success: true };
     }),
   }),

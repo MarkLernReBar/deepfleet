@@ -35,6 +35,7 @@ class AgentSpec:
     subagents: list[SubagentSpec] = field(default_factory=list)
     harness: dict[str, bool] = field(default_factory=dict)
     skills: list[str] = field(default_factory=list)
+    custom_model_config: dict[str, str] | None = None
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> "AgentSpec":
@@ -48,6 +49,8 @@ class AgentSpec:
             )
             for s in (data.get("subagents") or [])
         ]
+        raw_custom = data.get("custom_model_config")
+        custom_model_config = dict(raw_custom) if isinstance(raw_custom, dict) else None
         return cls(
             name=data.get("name", "agent"),
             model=data["model"],
@@ -57,6 +60,7 @@ class AgentSpec:
             subagents=subs,
             harness=dict(data.get("harness") or {}),
             skills=list(data.get("skills") or []),
+            custom_model_config=custom_model_config,
         )
 
 
@@ -86,7 +90,7 @@ def build_agent(spec: AgentSpec):
     tools = resolve_tools(spec.tools)
 
     kwargs: dict[str, Any] = {
-        "model": resolve_model(spec.model),
+        "model": resolve_model(spec.model, spec.custom_model_config),
         "system_prompt": spec.system_prompt,
         "tools": tools,
     }

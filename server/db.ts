@@ -5,6 +5,7 @@ import {
   agentTools,
   approvals,
   credentials,
+  customModels,
   fleets,
   runs,
   runSteps,
@@ -17,6 +18,7 @@ import {
   type InsertAgentTool,
   type InsertApproval,
   type InsertCredential,
+  type InsertCustomModel,
   type InsertFleet,
   type InsertRun,
   type InsertRunStep,
@@ -262,6 +264,27 @@ export async function updateCredential(id: number, data: Partial<InsertCredentia
 }
 export async function deleteCredential(id: number) {
   await (await db()).delete(credentials).where(eq(credentials.id, id));
+}
+
+/* -------------------------- Custom models ------------------------- */
+export async function listCustomModels() {
+  return (await db()).select().from(customModels).orderBy(customModels.displayName);
+}
+export async function getCustomModel(id: number) {
+  const r = await (await db()).select().from(customModels).where(eq(customModels.id, id)).limit(1);
+  return r[0];
+}
+export async function getCustomModelByModelId(modelId: string) {
+  const r = await (await db()).select().from(customModels).where(eq(customModels.modelId, modelId)).limit(1);
+  return r[0];
+}
+export async function createCustomModel(data: InsertCustomModel) {
+  const d = await db();
+  const r = await d.insert(customModels).values(data).$returningId();
+  return getCustomModel(r[0].id);
+}
+export async function deleteCustomModel(id: number) {
+  await (await db()).delete(customModels).where(eq(customModels.id, id));
 }
 
 /* ----------------------------- Shares ----------------------------- */
