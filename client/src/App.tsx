@@ -14,6 +14,7 @@ import Runs from "./pages/Runs";
 import RunTrace from "./pages/RunTrace";
 import Inbox from "./pages/Inbox";
 import Tools from "./pages/Tools";
+import Skills from "./pages/Skills";
 import Credentials from "./pages/Credentials";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/runs/:id" component={RunTrace} />
         <Route path="/inbox" component={Inbox} />
         <Route path="/tools" component={Tools} />
+        <Route path="/skills" component={Skills} />
         <Route path="/credentials" component={Credentials} />
         <Route component={NotFound} />
       </Switch>

@@ -7,6 +7,7 @@ import { Plus, Trash2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   MODEL_PROVIDERS,
   MODELS_BY_PROVIDER,
@@ -29,6 +30,7 @@ export default function AgentBuilder() {
 
   const { data: fleets } = trpc.fleet.fleets.list.useQuery();
   const { data: tools } = trpc.fleet.tools.list.useQuery({ onlyAvailable: true });
+  const { data: workspaceSkills } = trpc.fleet.skills.list.useQuery();
   const { data: existing } = trpc.fleet.agents.get.useQuery(
     { id: editId! },
     { enabled: editId !== null }
@@ -46,7 +48,7 @@ export default function AgentBuilder() {
   const [toolIds, setToolIds] = useState<number[]>([]);
   const [subagents, setSubagents] = useState<SubAgentDraft[]>([]);
   const [harness, setHarness] = useState({ ...HARNESS_DEFAULTS });
-  const [skills, setSkills] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
 
   // hydrate on edit
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function AgentBuilder() {
       }))
     );
     setHarness({ ...HARNESS_DEFAULTS, ...(a.harness ?? {}) });
-    setSkills(((a.skills as string[]) ?? []).join(", "));
+    setSkills((a.skills as string[]) ?? []);
   }, [existing]);
 
   // default fleet
@@ -90,6 +92,9 @@ export default function AgentBuilder() {
   });
 
   const toggleTool = (id: number) => setToolIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  const toggleSkill = (slug: string) =>
+    setSkills((p) => (p.includes(slug) ? p.filter((x) => x !== slug) : [...p, slug]));
 
   const toggleSubagentTool = (index: number, slug: string) =>
     setSubagents((p) =>
@@ -113,7 +118,7 @@ export default function AgentBuilder() {
       model: effectiveModel,
       systemPrompt,
       harness,
-      skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
+      skills,
       toolIds,
       subagents: subagents.filter((s) => s.name.trim()),
     };
@@ -378,8 +383,36 @@ export default function AgentBuilder() {
             </div>
             {harness.skills && (
               <div>
-                <Eyebrow className="mb-1.5">Skills (comma-separated)</Eyebrow>
-                <Input value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="research, citations" className="border-2 border-foreground font-mono" />
+                <Eyebrow className="mb-3">Workspace skills</Eyebrow>
+                {(workspaceSkills?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No workspace skills yet. Create skills on the Skills page to attach them here.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-input border-2 border-foreground">
+                    {workspaceSkills?.map((s) => (
+                      <label
+                        key={s.id}
+                        className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          checked={skills.includes(s.slug)}
+                          onCheckedChange={() => toggleSkill(s.slug)}
+                          className="mt-0.5 border-2 border-foreground"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold">{s.slug}</span>
+                            <span className="text-sm font-semibold">{s.name}</span>
+                          </div>
+                          {s.description && (
+                            <p className="mt-1 text-xs text-muted-foreground">{s.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {selectedFleet && (

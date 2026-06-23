@@ -9,6 +9,7 @@ import {
   runs,
   runSteps,
   shares,
+  skills,
   subagents,
   tools,
   users,
@@ -20,6 +21,7 @@ import {
   type InsertRun,
   type InsertRunStep,
   type InsertShare,
+  type InsertSkill,
   type InsertSubagent,
   type InsertTool,
   type InsertUser,
@@ -214,6 +216,31 @@ export async function deleteTool(id: number) {
   const d = await db();
   await d.delete(agentTools).where(eq(agentTools.toolId, id));
   await d.delete(tools).where(eq(tools.id, id));
+}
+
+/* ----------------------------- Skills ----------------------------- */
+export async function listSkills() {
+  return (await db()).select().from(skills).orderBy(skills.name);
+}
+export async function getSkill(id: number) {
+  const r = await (await db()).select().from(skills).where(eq(skills.id, id)).limit(1);
+  return r[0];
+}
+export async function getSkillBySlug(slug: string) {
+  const r = await (await db()).select().from(skills).where(eq(skills.slug, slug)).limit(1);
+  return r[0];
+}
+export async function createSkill(data: InsertSkill) {
+  const d = await db();
+  const r = await d.insert(skills).values(data).$returningId();
+  return getSkill(r[0].id);
+}
+export async function updateSkill(id: number, data: Partial<InsertSkill>) {
+  await (await db()).update(skills).set(data).where(eq(skills.id, id));
+  return getSkill(id);
+}
+export async function deleteSkill(id: number) {
+  await (await db()).delete(skills).where(eq(skills.id, id));
 }
 
 /* -------------------------- Credentials --------------------------- */

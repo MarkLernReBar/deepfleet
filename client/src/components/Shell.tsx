@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Inbox,
   Wrench,
+  Sparkles,
   KeyRound,
   Menu,
   X,
@@ -27,6 +28,7 @@ const NAV: NavItem[] = [
   { href: "/runs", label: "Runs", icon: Activity, match: (p) => p.startsWith("/runs") },
   { href: "/inbox", label: "Inbox", icon: Inbox, match: (p) => p.startsWith("/inbox") },
   { href: "/tools", label: "Tools & MCP", icon: Wrench, match: (p) => p.startsWith("/tools") },
+  { href: "/skills", label: "Skills", icon: Sparkles, match: (p) => p.startsWith("/skills") },
   { href: "/credentials", label: "Credentials", icon: KeyRound, match: (p) => p.startsWith("/credentials") },
 ];
 

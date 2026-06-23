@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import * as db from "./db";
+import { isValidSkillSlug } from "./skills";
 import { generateAgentCode } from "./codeExport";
 import { SHARE_ROLES } from "../shared/catalog";
 import { isWorkerConfigured, workerHealthy } from "./workerBridge";
@@ -21,6 +22,11 @@ const subagentInput = z.object({
   model: z.string().optional(),
   tools: z.array(z.string()).optional().default([]),
 });
+
+const skillSlugSchema = z
+  .string()
+  .min(1)
+  .refine(isValidSkillSlug, { message: "Slug must be lowercase alphanumeric with hyphens only" });
 
 export const fleetRouter = router({
   /* --------------------------- Run engine --------------------------- */
@@ -230,6 +236,62 @@ export const fleetRouter = router({
       .mutation(({ input }) => db.updateTool(input.id, { isAvailable: input.isAvailable })),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteTool(input.id);
+      return { success: true };
+    }),
+  }),
+
+  /* ----------------------------- Skills ----------------------------- */
+  skills: router({
+    list: protectedProcedure.query(() => db.listSkills()),
+    get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+      const skill = await db.getSkill(input.id);
+      if (!skill) throw new TRPCError({ code: "NOT_FOUND" });
+      return skill;
+    }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          slug: skillSlugSchema,
+          name: z.string().min(1),
+          description: z.string().optional(),
+          content: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getSkillBySlug(input.slug);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+        return db.createSkill({
+          slug: input.slug,
+          name: input.name,
+          description: input.description,
+          content: input.content,
+          createdBy: ctx.user.id,
+        });
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          slug: skillSlugSchema.optional(),
+          name: z.string().min(1).optional(),
+          description: z.string().optional(),
+          content: z.string().min(1).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, slug, ...rest } = input;
+        if (slug) {
+          const existing = await db.getSkillBySlug(slug);
+          if (existing && existing.id !== id) {
+            throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+          }
+        }
+        const skill = await db.updateSkill(id, { ...rest, ...(slug ? { slug } : {}) });
+        if (!skill) throw new TRPCError({ code: "NOT_FOUND" });
+        return skill;
+      }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteSkill(input.id);
       return { success: true };
     }),
   }),

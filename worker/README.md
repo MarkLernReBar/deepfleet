@@ -23,6 +23,7 @@ DeepFleet (Node/tRPC)  --POST /v1/runs/stream-->  Worker (FastAPI)
 - `deepfleet_worker/tools.py` provides LangChain tools matching DeepFleet's built-in catalog.
 - `deepfleet_worker/streaming.py` converts LangGraph `astream_events` into DeepFleet step types.
 - `deepfleet_worker/app.py` is the FastAPI service (`/health`, `/v1/runs/stream`).
+- Optional: set `DEEPFLEET_SKILLS_DIR` to a directory of SKILL.md files the worker loads at runtime.
 
 ## Run locally
 

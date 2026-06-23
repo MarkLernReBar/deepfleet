@@ -123,6 +123,23 @@ export type Tool = typeof tools.$inferSelect;
 export type InsertTool = typeof tools.$inferInsert;
 
 /* ------------------------------------------------------------------ */
+/* Skills — workspace SKILL.md catalog                                 */
+/* ------------------------------------------------------------------ */
+export const skills = mysqlTable("skills", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Skill = typeof skills.$inferSelect;
+export type InsertSkill = typeof skills.$inferInsert;
+
+/* ------------------------------------------------------------------ */
 /* AgentTool — which tools an agent has, with per-agent approval flag   */
 /* ------------------------------------------------------------------ */
 export const agentTools = mysqlTable(
