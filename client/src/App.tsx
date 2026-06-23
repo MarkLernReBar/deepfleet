@@ -16,12 +16,14 @@ import Inbox from "./pages/Inbox";
 import Tools from "./pages/Tools";
 import Skills from "./pages/Skills";
 import Credentials from "./pages/Credentials";
+import Chat from "./pages/Chat";
 
 function Router() {
   return (
     <Shell>
       <Switch>
         <Route path="/" component={Overview} />
+        <Route path="/chat" component={Chat} />
         <Route path="/fleets" component={Fleets} />
         <Route path="/agents" component={Agents} />
         <Route path="/agents/new" component={AgentBuilder} />

@@ -16,9 +16,12 @@ import {
   ArrowLeft,
   X,
   Brain,
+  Calendar,
+  Radio,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -40,7 +43,7 @@ import { SHARE_ROLES } from "@shared/catalog";
 import { cn } from "@/lib/utils";
 import { runAgentStream } from "@/lib/runStream";
 
-type TabId = "overview" | "memory" | "tools" | "sharing" | "code";
+type TabId = "overview" | "memory" | "tools" | "schedules" | "channels" | "sharing" | "code";
 
 export default function AgentDetail() {
   const [, params] = useRoute("/agents/:id");
@@ -53,6 +56,8 @@ export default function AgentDetail() {
   const { data: fleets } = trpc.fleet.fleets.list.useQuery();
   const { data: users } = trpc.fleet.users.list.useQuery();
   const { data: creds } = trpc.fleet.credentials.list.useQuery();
+  const { data: schedules } = trpc.fleet.schedules.list.useQuery({ agentId: id }, { enabled: !!id });
+  const { data: channels } = trpc.fleet.channels.list.useQuery({ agentId: id }, { enabled: !!id });
 
   const [tab, setTab] = useState<TabId>("overview");
   const [runOpen, setRunOpen] = useState(false);
@@ -62,6 +67,14 @@ export default function AgentDetail() {
   const [memoryContent, setMemoryContent] = useState("");
   const [memoryApprovalRequired, setMemoryApprovalRequired] = useState(true);
   const [memoryDirty, setMemoryDirty] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    name: "",
+    description: "",
+    cronExpression: "0 9 * * *",
+    prompt: "",
+    enabled: true,
+  });
 
   // sharing form
   const [shareRole, setShareRole] = useState<(typeof SHARE_ROLES)[number]>("viewer");
@@ -87,7 +100,37 @@ export default function AgentDetail() {
     onSuccess: () => {
       utils.fleet.agents.get.invalidate({ id });
       setMemoryDirty(false);
-      toast.success("Memory saved");
+      toast.success("Agent updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const createScheduleM = trpc.fleet.schedules.create.useMutation({
+    onSuccess: () => {
+      utils.fleet.schedules.list.invalidate({ agentId: id });
+      setScheduleOpen(false);
+      setScheduleForm({ name: "", description: "", cronExpression: "0 9 * * *", prompt: "", enabled: true });
+      toast.success("Schedule created");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateScheduleM = trpc.fleet.schedules.update.useMutation({
+    onSuccess: () => {
+      utils.fleet.schedules.list.invalidate({ agentId: id });
+      toast.success("Schedule updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteScheduleM = trpc.fleet.schedules.delete.useMutation({
+    onSuccess: () => {
+      utils.fleet.schedules.list.invalidate({ agentId: id });
+      toast.success("Schedule removed");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const upsertChannelM = trpc.fleet.channels.upsert.useMutation({
+    onSuccess: () => {
+      utils.fleet.channels.list.invalidate({ agentId: id });
+      toast.success("Channel updated");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -137,6 +180,8 @@ export default function AgentDetail() {
       ? [{ id: "memory" as const, label: "Memory", icon: Brain, prominent: true }]
       : [{ id: "memory" as const, label: "Memory", icon: Brain }]),
     { id: "tools", label: "Tools & Subagents", icon: Wrench },
+    { id: "schedules", label: "Schedules", icon: Calendar },
+    { id: "channels", label: "Channels", icon: Radio },
     { id: "sharing", label: "Sharing", icon: Users },
     { id: "code", label: "Code export", icon: Code2 },
   ];
@@ -146,6 +191,30 @@ export default function AgentDetail() {
       id,
       memoryContent: memoryContent.trim() || null,
       memoryApprovalRequired,
+    });
+  };
+
+  const channelEnabled = (type: "chat" | "slack" | "gmail") =>
+    channels?.find((c) => c.type === type)?.enabled ?? (type === "chat");
+
+  const toggleChannel = (type: "chat" | "slack" | "gmail", enabled: boolean) => {
+    if ((type === "slack" || type === "gmail") && enabled) {
+      return toast.info("OAuth connect for " + type + " coming in a later phase");
+    }
+    upsertChannelM.mutate({ agentId: id, type, enabled });
+  };
+
+  const submitSchedule = () => {
+    if (!scheduleForm.name.trim() || !scheduleForm.cronExpression.trim() || !scheduleForm.prompt.trim()) {
+      return toast.error("Name, cron, and prompt are required");
+    }
+    createScheduleM.mutate({
+      agentId: id,
+      name: scheduleForm.name.trim(),
+      description: scheduleForm.description.trim() || undefined,
+      cronExpression: scheduleForm.cronExpression.trim(),
+      prompt: scheduleForm.prompt.trim(),
+      enabled: scheduleForm.enabled,
     });
   };
 
@@ -180,6 +249,7 @@ export default function AgentDetail() {
         <IdentityTag type={agent.identityType} />
         <Tag variant="outline">{agent.model}</Tag>
         {credential && <Tag variant="muted">cred: {credential.name}</Tag>}
+        {agent.triggersPaused && <Tag variant="outline">Triggers paused</Tag>}
       </div>
 
       {/* tabs */}
@@ -225,6 +295,19 @@ export default function AgentDetail() {
                   </div>
                 ))}
               </div>
+            </Panel>
+            <Panel className="p-5">
+              <Eyebrow className="mb-3">Triggers</Eyebrow>
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span className="text-sm">Pause scheduled runs</span>
+                <Switch
+                  checked={agent.triggersPaused}
+                  onCheckedChange={(v) => updateM.mutate({ id, triggersPaused: v })}
+                />
+              </label>
+              <p className="mt-2 text-xs text-muted-foreground">
+                When paused, cron schedules will not fire until re-enabled.
+              </p>
             </Panel>
             <Panel className="p-5">
               <Eyebrow className="mb-3">Recent runs</Eyebrow>
@@ -354,6 +437,94 @@ export default function AgentDetail() {
         </div>
       )}
 
+      {tab === "schedules" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Cron schedules run this agent automatically. Standard 5-field cron (UTC).
+            </p>
+            <button
+              onClick={() => setScheduleOpen(true)}
+              className="press inline-flex items-center gap-2 bg-foreground px-4 py-2.5 text-background"
+            >
+              <Calendar className="h-4 w-4" /> <span className="mono-label">Add schedule</span>
+            </button>
+          </div>
+          {(schedules?.length ?? 0) === 0 ? (
+            <EmptyBlock title="No schedules" description="Add a cron schedule to run this agent on a timer." />
+          ) : (
+            <div className="space-y-3">
+              {schedules!.map((s) => (
+                <Panel key={s.id} className="p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-bold">{s.name}</span>
+                        <Tag variant={s.enabled ? "solid" : "outline"}>{s.enabled ? "enabled" : "disabled"}</Tag>
+                      </div>
+                      {s.description && <p className="mt-1 text-xs text-muted-foreground">{s.description}</p>}
+                      <div className="mt-2 font-mono text-xs">
+                        <span className="text-muted-foreground">cron </span>
+                        {s.cronExpression}
+                      </div>
+                      <pre className="mt-2 max-h-24 overflow-auto border border-input bg-muted p-2 font-mono text-[0.7rem]">{s.prompt}</pre>
+                      {s.lastRunAt && (
+                        <p className="mt-2 font-mono text-[0.65rem] text-muted-foreground">
+                          Last run: {new Date(s.lastRunAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        onClick={() => updateScheduleM.mutate({ id: s.id, enabled: !s.enabled })}
+                        className="press border-2 border-foreground px-3 py-1.5 mono-label"
+                      >
+                        {s.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        onClick={() => deleteScheduleM.mutate({ id: s.id })}
+                        className="press border border-input p-1.5 hover:bg-muted"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "channels" && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {(
+            [
+              { type: "chat" as const, label: "Chat", desc: "In-app threaded chat (enabled by default)" },
+              { type: "slack" as const, label: "Slack", desc: "Post and receive via Slack workspace" },
+              { type: "gmail" as const, label: "Gmail", desc: "Email inbox and send via Gmail" },
+            ] as const
+          ).map((ch) => (
+            <Panel key={ch.type} className="p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <Eyebrow>{ch.label}</Eyebrow>
+                <Switch
+                  checked={channelEnabled(ch.type)}
+                  onCheckedChange={(v) => toggleChannel(ch.type, v)}
+                  disabled={upsertChannelM.isPending}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">{ch.desc}</p>
+              {ch.type === "chat" && channelEnabled("chat") && (
+                <Link href={`/chat?agentId=${id}`}>
+                  <span className="press mt-4 inline-block mono-label text-sm underline">Open chat →</span>
+                </Link>
+              )}
+            </Panel>
+          ))}
+        </div>
+      )}
+
       {tab === "sharing" && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Panel className="p-5 lg:col-span-2">
@@ -467,6 +638,57 @@ export default function AgentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="border-2 border-foreground">
+          <DialogHeader>
+            <DialogTitle className="display-hero text-2xl">New schedule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Eyebrow className="mb-1">Name</Eyebrow>
+              <Input
+                value={scheduleForm.name}
+                onChange={(e) => setScheduleForm((f) => ({ ...f, name: e.target.value }))}
+                className="border-2 border-foreground"
+                placeholder="Daily standup digest"
+              />
+            </div>
+            <div>
+              <Eyebrow className="mb-1">Cron (UTC)</Eyebrow>
+              <Input
+                value={scheduleForm.cronExpression}
+                onChange={(e) => setScheduleForm((f) => ({ ...f, cronExpression: e.target.value }))}
+                className="border-2 border-foreground font-mono"
+                placeholder="0 9 * * *"
+              />
+            </div>
+            <div>
+              <Eyebrow className="mb-1">Prompt</Eyebrow>
+              <Textarea
+                value={scheduleForm.prompt}
+                onChange={(e) => setScheduleForm((f) => ({ ...f, prompt: e.target.value }))}
+                rows={4}
+                className="border-2 border-foreground"
+                placeholder="What should the agent do on each run?"
+              />
+            </div>
+            <label className="flex items-center gap-3">
+              <Switch
+                checked={scheduleForm.enabled}
+                onCheckedChange={(v) => setScheduleForm((f) => ({ ...f, enabled: v }))}
+              />
+              <span className="text-sm">Enabled</span>
+            </label>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setScheduleOpen(false)} className="press border-2 border-foreground px-4 py-2 mono-label">Cancel</button>
+            <button onClick={submitSchedule} disabled={createScheduleM.isPending} className="press bg-foreground px-4 py-2 text-background mono-label disabled:opacity-50">
+              {createScheduleM.isPending ? "Creating…" : "Create"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

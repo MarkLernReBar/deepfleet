@@ -13,6 +13,7 @@ import {
   X,
   LogOut,
   Activity,
+  MessageSquare,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
@@ -22,6 +23,7 @@ import { Display, Eyebrow } from "@/components/brutal";
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; match: (p: string) => boolean };
 
 const NAV: NavItem[] = [
+  { href: "/chat", label: "Chat", icon: MessageSquare, match: (p) => p.startsWith("/chat") },
   { href: "/", label: "Overview", icon: LayoutDashboard, match: (p) => p === "/" },
   { href: "/fleets", label: "Fleets", icon: Boxes, match: (p) => p.startsWith("/fleets") },
   { href: "/agents", label: "Agents", icon: Bot, match: (p) => p.startsWith("/agents") },
