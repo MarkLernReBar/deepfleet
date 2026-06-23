@@ -165,6 +165,10 @@ export async function executeRunViaWorker(runId: number, emit: Emit): Promise<vo
       await persistStep(type, name, content);
     } else if (eventName === "done") {
       finalOutput = (data.output as string) ?? "";
+      const langsmithRunId = (data.langsmith_run_id as string) ?? (data.langsmithRunId as string);
+      if (langsmithRunId) {
+        await updateRun(runId, { langsmithRunId });
+      }
     } else if (eventName === "error") {
       throw new Error((data.error as string) ?? "Worker run failed");
     }

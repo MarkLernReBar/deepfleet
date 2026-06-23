@@ -14,6 +14,7 @@ import {
   LogOut,
   Activity,
   MessageSquare,
+  LayoutTemplate,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
@@ -24,6 +25,7 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; matc
 
 const NAV: NavItem[] = [
   { href: "/chat", label: "Chat", icon: MessageSquare, match: (p) => p.startsWith("/chat") },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate, match: (p) => p.startsWith("/templates") },
   { href: "/", label: "Overview", icon: LayoutDashboard, match: (p) => p === "/" },
   { href: "/fleets", label: "Fleets", icon: Boxes, match: (p) => p.startsWith("/fleets") },
   { href: "/agents", label: "Agents", icon: Bot, match: (p) => p.startsWith("/agents") },

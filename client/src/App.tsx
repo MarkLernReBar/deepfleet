@@ -17,6 +17,7 @@ import Tools from "./pages/Tools";
 import Skills from "./pages/Skills";
 import Credentials from "./pages/Credentials";
 import Chat from "./pages/Chat";
+import Templates from "./pages/Templates";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Overview} />
         <Route path="/chat" component={Chat} />
+        <Route path="/templates" component={Templates} />
         <Route path="/fleets" component={Fleets} />
         <Route path="/agents" component={Agents} />
         <Route path="/agents/new" component={AgentBuilder} />

@@ -266,6 +266,8 @@ export const runs = mysqlTable(
     // estimated cost in micro-dollars (1e-6 USD) to avoid float drift
     costMicroUsd: bigint("costMicroUsd", { mode: "number" }).default(0).notNull(),
     errorMessage: text("errorMessage"),
+    // optional LangSmith run id for external trace linking
+    langsmithRunId: varchar("langsmithRunId", { length: 120 }),
     triggeredBy: int("triggeredBy").notNull(),
     startedAt: timestamp("startedAt"),
     endedAt: timestamp("endedAt"),

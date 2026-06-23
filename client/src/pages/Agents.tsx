@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Eyebrow, Panel, PageHeader, EmptyBlock, IdentityTag, StatusTag, Tag } from "@/components/brutal";
 import { Link, useSearch } from "wouter";
 import { useMemo, useState } from "react";
-import { Plus, Bot } from "lucide-react";
+import { Plus, Bot, LayoutTemplate } from "lucide-react";
 
 const STATUSES = ["all", "active", "draft", "paused", "archived"] as const;
 
@@ -32,11 +32,18 @@ export default function Agents() {
         title="Agents"
         description="Every deepagent across your fleets. Each agent carries its model, prompt, tools, subagents, and harness."
         actions={
-          <Link href={fleetFilter ? `/agents/new?fleet=${fleetFilter}` : "/agents/new"}>
-            <span className="press inline-flex items-center gap-2 bg-foreground px-4 py-2.5 text-background shadow-brutal-sm">
-              <Plus className="h-4 w-4" /> <span className="mono-label">New agent</span>
-            </span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/templates">
+              <span className="press inline-flex items-center gap-2 border-2 border-foreground px-4 py-2.5">
+                <LayoutTemplate className="h-4 w-4" /> <span className="mono-label">Templates</span>
+              </span>
+            </Link>
+            <Link href={fleetFilter ? `/agents/new?fleet=${fleetFilter}` : "/agents/new"}>
+              <span className="press inline-flex items-center gap-2 bg-foreground px-4 py-2.5 text-background shadow-brutal-sm">
+                <Plus className="h-4 w-4" /> <span className="mono-label">New agent</span>
+              </span>
+            </Link>
+          </div>
         }
       />
 

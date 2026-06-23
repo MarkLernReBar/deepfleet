@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CREDENTIAL_PROVIDERS } from "@shared/catalog";
 import { cn } from "@/lib/utils";
 
 export default function Credentials() {
@@ -97,7 +98,18 @@ export default function Credentials() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Eyebrow className="mb-1.5">Provider</Eyebrow>
-                <Input value={provider} onChange={(e) => setProvider(e.target.value)} className="border-2 border-foreground font-mono" />
+                <Select value={provider} onValueChange={setProvider}>
+                  <SelectTrigger className="rounded-none border-2 border-foreground font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CREDENTIAL_PROVIDERS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Eyebrow className="mb-1.5">Kind</Eyebrow>

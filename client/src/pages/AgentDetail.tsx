@@ -18,7 +18,9 @@ import {
   Brain,
   Calendar,
   Radio,
+  Network,
 } from "lucide-react";
+import { AgentGraph } from "@/components/AgentGraph";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -43,7 +45,7 @@ import { SHARE_ROLES } from "@shared/catalog";
 import { cn } from "@/lib/utils";
 import { runAgentStream } from "@/lib/runStream";
 
-type TabId = "overview" | "memory" | "tools" | "schedules" | "channels" | "sharing" | "code";
+type TabId = "overview" | "graph" | "memory" | "tools" | "schedules" | "channels" | "sharing" | "code";
 
 export default function AgentDetail() {
   const [, params] = useRoute("/agents/:id");
@@ -176,6 +178,7 @@ export default function AgentDetail() {
 
   const TABS: { id: TabId; label: string; icon: typeof Bot; prominent?: boolean }[] = [
     { id: "overview", label: "Overview", icon: Bot },
+    { id: "graph", label: "Graph", icon: Network },
     ...(memoryHarnessOn
       ? [{ id: "memory" as const, label: "Memory", icon: Brain, prominent: true }]
       : [{ id: "memory" as const, label: "Memory", icon: Brain }]),
@@ -197,12 +200,32 @@ export default function AgentDetail() {
   const channelEnabled = (type: "chat" | "slack" | "gmail") =>
     channels?.find((c) => c.type === type)?.enabled ?? (type === "chat");
 
-  const toggleChannel = (type: "chat" | "slack" | "gmail", enabled: boolean) => {
-    if ((type === "slack" || type === "gmail") && enabled) {
-      return toast.info("OAuth connect for " + type + " coming in a later phase");
-    }
-    upsertChannelM.mutate({ agentId: id, type, enabled });
+  const channelConfig = (type: "chat" | "slack" | "gmail") => {
+    const ch = channels?.find((c) => c.type === type);
+    return (ch?.config as { credentialId?: number } | null) ?? {};
   };
+
+  const toggleChannel = (type: "chat" | "slack" | "gmail", enabled: boolean) => {
+    const config = channelConfig(type);
+    upsertChannelM.mutate({
+      agentId: id,
+      type,
+      enabled,
+      config: Object.keys(config).length ? config : null,
+    });
+  };
+
+  const setChannelCredential = (type: "slack" | "gmail", credentialId: string) => {
+    upsertChannelM.mutate({
+      agentId: id,
+      type,
+      enabled: channelEnabled(type),
+      config: credentialId ? { credentialId: Number(credentialId) } : null,
+    });
+  };
+
+  const credsForProvider = (provider: string) =>
+    creds?.filter((c) => c.provider === provider || (provider === "gmail" && c.provider === "google")) ?? [];
 
   const submitSchedule = () => {
     if (!scheduleForm.name.trim() || !scheduleForm.cronExpression.trim() || !scheduleForm.prompt.trim()) {
@@ -328,6 +351,25 @@ export default function AgentDetail() {
             </Panel>
           </div>
         </div>
+      )}
+
+      {tab === "graph" && (
+        <Panel className="p-5">
+          <AgentGraph
+            agentName={agent.name}
+            model={`${agent.modelProvider}:${agent.model}`}
+            tools={tools.map((t) => ({ slug: t.tool.slug, type: t.tool.type }))}
+            subagents={subagents.map((s) => ({ name: s.name, model: s.model }))}
+            skills={(agent.skills as string[]) ?? []}
+            schedules={(schedules ?? []).map((s) => ({
+              name: s.name,
+              enabled: s.enabled,
+              cronExpression: s.cronExpression,
+            }))}
+            channels={(channels ?? []).map((c) => ({ type: c.type, enabled: c.enabled }))}
+            triggersPaused={agent.triggersPaused}
+          />
+        </Panel>
       )}
 
       {tab === "memory" && (
@@ -519,6 +561,29 @@ export default function AgentDetail() {
                 <Link href={`/chat?agentId=${id}`}>
                   <span className="press mt-4 inline-block mono-label text-sm underline">Open chat →</span>
                 </Link>
+              )}
+              {(ch.type === "slack" || ch.type === "gmail") && (
+                <div className="mt-4 space-y-2 border-t border-input pt-4">
+                  <Eyebrow>Credential</Eyebrow>
+                  <Select
+                    value={channelConfig(ch.type).credentialId ? String(channelConfig(ch.type).credentialId) : ""}
+                    onValueChange={(v) => setChannelCredential(ch.type, v)}
+                  >
+                    <SelectTrigger className="rounded-none border-2 border-foreground">
+                      <SelectValue placeholder={`Select ${ch.label} OAuth credential`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {credsForProvider(ch.type).map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name} ({c.kind})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Link href="/credentials">
+                    <span className="text-xs underline text-muted-foreground">Manage credentials →</span>
+                  </Link>
+                </div>
               )}
             </Panel>
           ))}

@@ -8,6 +8,10 @@ import { generateAgentCode } from "./codeExport";
 import { SHARE_ROLES } from "../shared/catalog";
 import { isWorkerConfigured, workerHealthy } from "./workerBridge";
 import { createAndExecuteRun } from "./agentRun";
+import { AGENT_TEMPLATES, getAgentTemplate } from "../shared/agentTemplates";
+import { instantiateAgentTemplate } from "./templates";
+import { buildLangSmithTraceUrl } from "../shared/langsmith";
+import { ENV } from "./_core/env";
 
 const harnessSchema = z.object({
   planning: z.boolean(),
@@ -412,6 +416,46 @@ export const fleetRouter = router({
       const steps = await db.listRunSteps(input.id);
       return { run, steps };
     }),
+    langsmithUrl: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+      const run = await db.getRun(input.id);
+      if (!run?.langsmithRunId) return { url: null as string | null };
+      const url = buildLangSmithTraceUrl(run.langsmithRunId, {
+        org: ENV.langsmithOrg,
+        project: ENV.langsmithProject,
+        host: ENV.langsmithHost || undefined,
+      });
+      return { url, runId: run.langsmithRunId };
+    }),
+  }),
+
+  /* ---------------------------- Templates --------------------------- */
+  templates: router({
+    list: protectedProcedure.query(() =>
+      AGENT_TEMPLATES.map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        category: t.category,
+        toolCount: t.toolSlugs.length,
+        subagentCount: t.subagents.length,
+      }))
+    ),
+    get: protectedProcedure.input(z.object({ id: z.string() })).query(({ input }) => {
+      const template = getAgentTemplate(input.id);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      return template;
+    }),
+    instantiate: protectedProcedure
+      .input(
+        z.object({
+          templateId: z.string(),
+          fleetId: z.number(),
+          name: z.string().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        instantiateAgentTemplate(input.templateId, input.fleetId, ctx.user.id, input.name)
+      ),
   }),
 
   /* ---------------------------- Approvals --------------------------- */
