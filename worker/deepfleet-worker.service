@@ -1,0 +1,17 @@
+[Unit]
+Description=DeepFleet deepagents worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User and WorkingDirectory to your machine.
+User=ubuntu
+WorkingDirectory=/opt/deepfleet/worker
+EnvironmentFile=/opt/deepfleet/worker/.env
+ExecStart=/opt/deepfleet/worker/.venv/bin/uvicorn deepfleet_worker.app:app --host 0.0.0.0 --port 8787
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
