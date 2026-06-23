@@ -63,7 +63,9 @@ Phase 2: cron schedules + pause triggers, channels (chat/Slack/Gmail stubs), thr
 
 Phase 3: templates gallery, agent graph view, LangSmith trace links, channel credential wiring.
 
-Plan docs: [docs/plans/fleet-parity-phase-1.md](./docs/plans/fleet-parity-phase-1.md), [docs/plans/fleet-parity-phase-2.md](./docs/plans/fleet-parity-phase-2.md), [docs/plans/fleet-parity-phase-3.md](./docs/plans/fleet-parity-phase-3.md).
+Phase 4: worker LangSmith run id, first-party MCP tool catalog, OAuth Connect for Slack/Gmail.
+
+Plan docs: [docs/plans/fleet-parity-phase-1.md](./docs/plans/fleet-parity-phase-1.md), [docs/plans/fleet-parity-phase-2.md](./docs/plans/fleet-parity-phase-2.md), [docs/plans/fleet-parity-phase-3.md](./docs/plans/fleet-parity-phase-3.md), [docs/plans/fleet-parity-phase-4.md](./docs/plans/fleet-parity-phase-4.md).
 
 ## Environment
 

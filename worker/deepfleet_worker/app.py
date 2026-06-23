@@ -124,7 +124,16 @@ async def run_stream(req: RunRequest) -> StreamingResponse:
             agent = build_agent(spec)
             async for step in stream_agent_events(agent, req.input):
                 if step.get("final"):
-                    yield _sse("done", {"runId": req.run_id, "status": "succeeded", "output": step["content"].get("message", "")})
+                    content = step["content"]
+                    yield _sse(
+                        "done",
+                        {
+                            "runId": req.run_id,
+                            "status": "succeeded",
+                            "output": content.get("message", ""),
+                            "langsmith_run_id": content.get("langsmith_run_id"),
+                        },
+                    )
                 else:
                     yield _sse("step", {"type": step["type"], "content": step["content"]})
         except Exception as exc:  # noqa: BLE001
