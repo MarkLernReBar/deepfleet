@@ -63,6 +63,8 @@ export default function AgentBuilder() {
   const [subagents, setSubagents] = useState<SubAgentDraft[]>([]);
   const [harness, setHarness] = useState({ ...HARNESS_DEFAULTS });
   const [skills, setSkills] = useState<string[]>([]);
+  const [memoryContent, setMemoryContent] = useState("");
+  const [memoryApprovalRequired, setMemoryApprovalRequired] = useState(true);
 
   // hydrate on edit
   useEffect(() => {
@@ -94,6 +96,8 @@ export default function AgentBuilder() {
     );
     setHarness({ ...HARNESS_DEFAULTS, ...(a.harness ?? {}) });
     setSkills((a.skills as string[]) ?? []);
+    setMemoryContent(a.memoryContent ?? "");
+    setMemoryApprovalRequired(a.memoryApprovalRequired ?? true);
   }, [existing]);
 
   // Match workspace model selection when editing a custom-model agent
@@ -201,6 +205,8 @@ export default function AgentBuilder() {
       systemPrompt,
       harness,
       skills,
+      memoryContent: harness.memory ? memoryContent.trim() || null : null,
+      memoryApprovalRequired: harness.memory ? memoryApprovalRequired : undefined,
       toolIds,
       subagents: subagents.filter((s) => s.name.trim()),
     };
@@ -525,6 +531,25 @@ export default function AgentBuilder() {
                 ))}
               </div>
             </div>
+            {harness.memory && (
+              <div>
+                <Eyebrow className="mb-3">Initial AGENTS.md (optional)</Eyebrow>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Seed persistent memory now, or edit anytime from the agent&apos;s Memory tab after creation.
+                </p>
+                <Textarea
+                  value={memoryContent}
+                  onChange={(e) => setMemoryContent(e.target.value)}
+                  rows={8}
+                  placeholder="# Agent memory&#10;&#10;Context that should persist across runs…"
+                  className="border-2 border-foreground font-mono text-xs"
+                />
+                <label className="mt-3 flex cursor-pointer items-center gap-3">
+                  <Switch checked={memoryApprovalRequired} onCheckedChange={setMemoryApprovalRequired} />
+                  <span className="text-sm">Require approval before memory writes</span>
+                </label>
+              </div>
+            )}
             {harness.skills && (
               <div>
                 <Eyebrow className="mb-3">Workspace skills</Eyebrow>

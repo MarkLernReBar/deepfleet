@@ -39,7 +39,7 @@ export async function workerHealthy(timeoutMs = 4000): Promise<boolean> {
 /**
  * Build the AgentSpec payload the Python worker expects from a DeepFleet agent.
  */
-async function buildSpec(agentId: number, input: string) {
+export async function buildSpec(agentId: number, input: string) {
   const agent = await getAgent(agentId);
   if (!agent) throw new Error("Agent not found");
   const toolRows = await getAgentTools(agentId);
@@ -87,6 +87,12 @@ async function buildSpec(agentId: number, input: string) {
       })),
       harness,
       skills: (agent.skills ?? []) as string[],
+      ...(harness.memory
+        ? {
+            memory_content: agent.memoryContent ?? "",
+            memory_approval_required: agent.memoryApprovalRequired ?? true,
+          }
+        : {}),
       input,
     },
   };

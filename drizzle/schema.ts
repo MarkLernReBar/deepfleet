@@ -75,8 +75,11 @@ export const agents = mysqlTable(
     harness: json("harness").$type<HarnessOptions>(),
     // list of skill names (on-demand knowledge)
     skills: json("skills").$type<string[]>(),
-    // AGENTS.md memory entries
+    // AGENTS.md memory entries (legacy list; prefer memoryContent)
     memory: json("memory").$type<string[]>(),
+    // AGENTS.md body persisted for the Memory workspace tab
+    memoryContent: text("memoryContent"),
+    memoryApprovalRequired: boolean("memoryApprovalRequired").default(true).notNull(),
     credentialId: int("credentialId"),
     createdBy: int("createdBy").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

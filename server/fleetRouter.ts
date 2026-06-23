@@ -93,6 +93,8 @@ export const fleetRouter = router({
           harness: harnessSchema.optional(),
           skills: z.array(z.string()).optional(),
           memory: z.array(z.string()).optional(),
+          memoryContent: z.string().nullable().optional(),
+          memoryApprovalRequired: z.boolean().optional(),
           credentialId: z.number().nullable().optional(),
           toolIds: z.array(z.number()).optional().default([]),
           subagents: z.array(subagentInput).optional().default([]),
@@ -111,6 +113,8 @@ export const fleetRouter = router({
           harness: input.harness,
           skills: input.skills,
           memory: input.memory,
+          memoryContent: input.memoryContent ?? null,
+          memoryApprovalRequired: input.memoryApprovalRequired,
           credentialId: input.credentialId ?? null,
           createdBy: ctx.user.id,
         });
@@ -135,6 +139,8 @@ export const fleetRouter = router({
           harness: harnessSchema.optional(),
           skills: z.array(z.string()).optional(),
           memory: z.array(z.string()).optional(),
+          memoryContent: z.string().nullable().optional(),
+          memoryApprovalRequired: z.boolean().optional(),
           credentialId: z.number().nullable().optional(),
           toolIds: z.array(z.number()).optional(),
           subagents: z.array(subagentInput).optional(),
@@ -168,6 +174,8 @@ export const fleetRouter = router({
         harness: src.harness,
         skills: src.skills,
         memory: src.memory,
+        memoryContent: src.memoryContent,
+        memoryApprovalRequired: src.memoryApprovalRequired,
         createdBy: ctx.user.id,
       });
       if (!agent) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

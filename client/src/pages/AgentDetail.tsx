@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Eyebrow, Panel, PageHeader, IdentityTag, StatusTag, Tag, EmptyBlock } from "@/components/brutal";
 import { useLocation, useRoute, Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Play,
@@ -15,8 +15,10 @@ import {
   Bot,
   ArrowLeft,
   X,
+  Brain,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -38,7 +40,7 @@ import { SHARE_ROLES } from "@shared/catalog";
 import { cn } from "@/lib/utils";
 import { runAgentStream } from "@/lib/runStream";
 
-type TabId = "overview" | "tools" | "sharing" | "code";
+type TabId = "overview" | "memory" | "tools" | "sharing" | "code";
 
 export default function AgentDetail() {
   const [, params] = useRoute("/agents/:id");
@@ -57,6 +59,9 @@ export default function AgentDetail() {
   const [runInput, setRunInput] = useState("");
   const [launching, setLaunching] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [memoryContent, setMemoryContent] = useState("");
+  const [memoryApprovalRequired, setMemoryApprovalRequired] = useState(true);
+  const [memoryDirty, setMemoryDirty] = useState(false);
 
   // sharing form
   const [shareRole, setShareRole] = useState<(typeof SHARE_ROLES)[number]>("viewer");
@@ -78,12 +83,27 @@ export default function AgentDetail() {
     onSuccess: () => { utils.fleet.agents.get.invalidate({ id }); toast.success("Access revoked"); },
     onError: (e) => toast.error(e.message),
   });
+  const updateM = trpc.fleet.agents.update.useMutation({
+    onSuccess: () => {
+      utils.fleet.agents.get.invalidate({ id });
+      setMemoryDirty(false);
+      toast.success("Memory saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    if (memoryDirty || !data?.agent) return;
+    setMemoryContent(data.agent.memoryContent ?? "");
+    setMemoryApprovalRequired(data.agent.memoryApprovalRequired ?? true);
+  }, [data?.agent.memoryContent, data?.agent.memoryApprovalRequired, memoryDirty, data?.agent]);
 
   if (isLoading || !data) {
     return <div className="eyebrow animate-pulse">Loading agent…</div>;
   }
 
   const { agent, tools, subagents, shares, runs } = data;
+  const memoryHarnessOn = Boolean(agent.harness?.memory);
   const fleet = fleets?.find((f) => f.id === agent.fleetId);
   const credential = creds?.find((c) => c.id === agent.credentialId);
 
@@ -111,12 +131,23 @@ export default function AgentDetail() {
     }
   };
 
-  const TABS: { id: TabId; label: string; icon: typeof Bot }[] = [
+  const TABS: { id: TabId; label: string; icon: typeof Bot; prominent?: boolean }[] = [
     { id: "overview", label: "Overview", icon: Bot },
+    ...(memoryHarnessOn
+      ? [{ id: "memory" as const, label: "Memory", icon: Brain, prominent: true }]
+      : [{ id: "memory" as const, label: "Memory", icon: Brain }]),
     { id: "tools", label: "Tools & Subagents", icon: Wrench },
     { id: "sharing", label: "Sharing", icon: Users },
     { id: "code", label: "Code export", icon: Code2 },
   ];
+
+  const saveMemory = () => {
+    updateM.mutate({
+      id,
+      memoryContent: memoryContent.trim() || null,
+      memoryApprovalRequired,
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -159,9 +190,19 @@ export default function AgentDetail() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={cn("press -mb-0.5 flex items-center gap-2 border-2 border-b-0 px-4 py-2.5", tab === t.id ? "border-foreground bg-foreground text-background" : "border-transparent text-muted-foreground hover:text-foreground")}
+              className={cn(
+                "press -mb-0.5 flex items-center gap-2 border-2 border-b-0 px-4 py-2.5",
+                tab === t.id
+                  ? "border-foreground bg-foreground text-background"
+                  : t.prominent
+                  ? "border-foreground bg-muted text-foreground shadow-brutal-sm"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
             >
               <Icon className="h-4 w-4" /> <span className="mono-label">{t.label}</span>
+              {t.prominent && tab !== t.id && (
+                <span className="mono-label bg-foreground px-1.5 py-0.5 text-[0.6rem] text-background">ON</span>
+              )}
             </button>
           );
         })}
@@ -204,6 +245,51 @@ export default function AgentDetail() {
             </Panel>
           </div>
         </div>
+      )}
+
+      {tab === "memory" && (
+        <Panel className="p-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <Eyebrow>AGENTS.md</Eyebrow>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Persistent agent memory injected into the system prompt on each run when the memory harness is enabled.
+              </p>
+            </div>
+            {!memoryHarnessOn && (
+              <Tag variant="outline">Memory harness off — enable in agent settings to inject at runtime</Tag>
+            )}
+          </div>
+          <Textarea
+            value={memoryContent}
+            onChange={(e) => {
+              setMemoryContent(e.target.value);
+              setMemoryDirty(true);
+            }}
+            rows={18}
+            placeholder="# Agent memory&#10;&#10;Notes, preferences, and context that persist across runs…"
+            className="border-2 border-foreground font-mono text-xs"
+          />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t-2 border-foreground pt-4">
+            <label className="flex cursor-pointer items-center gap-3">
+              <Switch
+                checked={memoryApprovalRequired}
+                onCheckedChange={(v) => {
+                  setMemoryApprovalRequired(v);
+                  setMemoryDirty(true);
+                }}
+              />
+              <span className="text-sm">Require approval before memory writes</span>
+            </label>
+            <button
+              onClick={saveMemory}
+              disabled={updateM.isPending || !memoryDirty}
+              className="press inline-flex items-center gap-2 bg-foreground px-4 py-2.5 text-background disabled:opacity-50"
+            >
+              <span className="mono-label">{updateM.isPending ? "Saving…" : "Save memory"}</span>
+            </button>
+          </div>
+        </Panel>
       )}
 
       {tab === "tools" && (
