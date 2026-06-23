@@ -7,11 +7,13 @@ import {
   LayoutDashboard,
   Inbox,
   Wrench,
+  Sparkles,
   KeyRound,
   Menu,
   X,
   LogOut,
   Activity,
+  MessageSquare,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
@@ -21,12 +23,14 @@ import { Display, Eyebrow } from "@/components/brutal";
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; match: (p: string) => boolean };
 
 const NAV: NavItem[] = [
+  { href: "/chat", label: "Chat", icon: MessageSquare, match: (p) => p.startsWith("/chat") },
   { href: "/", label: "Overview", icon: LayoutDashboard, match: (p) => p === "/" },
   { href: "/fleets", label: "Fleets", icon: Boxes, match: (p) => p.startsWith("/fleets") },
   { href: "/agents", label: "Agents", icon: Bot, match: (p) => p.startsWith("/agents") },
   { href: "/runs", label: "Runs", icon: Activity, match: (p) => p.startsWith("/runs") },
   { href: "/inbox", label: "Inbox", icon: Inbox, match: (p) => p.startsWith("/inbox") },
   { href: "/tools", label: "Tools & MCP", icon: Wrench, match: (p) => p.startsWith("/tools") },
+  { href: "/skills", label: "Skills", icon: Sparkles, match: (p) => p.startsWith("/skills") },
   { href: "/credentials", label: "Credentials", icon: KeyRound, match: (p) => p.startsWith("/credentials") },
 ];
 

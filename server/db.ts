@@ -2,27 +2,42 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   agents,
+  agentChannels,
+  agentSchedules,
   agentTools,
   approvals,
+  chatMessages,
+  chatThreads,
   credentials,
+  customModels,
   fleets,
   runs,
   runSteps,
   shares,
+  skills,
   subagents,
   tools,
   users,
   type InsertAgent,
+  type InsertAgentChannel,
+  type InsertAgentSchedule,
   type InsertAgentTool,
   type InsertApproval,
+  type InsertChatMessage,
+  type InsertChatThread,
   type InsertCredential,
+  type InsertCustomModel,
   type InsertFleet,
   type InsertRun,
   type InsertRunStep,
   type InsertShare,
+  type InsertSkill,
   type InsertSubagent,
   type InsertTool,
   type InsertUser,
+  type Run,
+  type Approval,
+  type AgentChannel,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -143,6 +158,14 @@ export async function deleteAgentCascade(id: number) {
   await d.delete(agentTools).where(eq(agentTools.agentId, id));
   await d.delete(subagents).where(eq(subagents.agentId, id));
   await d.delete(shares).where(eq(shares.agentId, id));
+  await d.delete(agentSchedules).where(eq(agentSchedules.agentId, id));
+  await d.delete(agentChannels).where(eq(agentChannels.agentId, id));
+  const threads = await d.select({ id: chatThreads.id }).from(chatThreads).where(eq(chatThreads.agentId, id));
+  const threadIds = threads.map((t) => t.id);
+  if (threadIds.length) {
+    await d.delete(chatMessages).where(inArray(chatMessages.threadId, threadIds));
+  }
+  await d.delete(chatThreads).where(eq(chatThreads.agentId, id));
   const agentRuns = await d.select({ id: runs.id }).from(runs).where(eq(runs.agentId, id));
   const runIds = agentRuns.map((r) => r.id);
   if (runIds.length) {
@@ -216,6 +239,31 @@ export async function deleteTool(id: number) {
   await d.delete(tools).where(eq(tools.id, id));
 }
 
+/* ----------------------------- Skills ----------------------------- */
+export async function listSkills() {
+  return (await db()).select().from(skills).orderBy(skills.name);
+}
+export async function getSkill(id: number) {
+  const r = await (await db()).select().from(skills).where(eq(skills.id, id)).limit(1);
+  return r[0];
+}
+export async function getSkillBySlug(slug: string) {
+  const r = await (await db()).select().from(skills).where(eq(skills.slug, slug)).limit(1);
+  return r[0];
+}
+export async function createSkill(data: InsertSkill) {
+  const d = await db();
+  const r = await d.insert(skills).values(data).$returningId();
+  return getSkill(r[0].id);
+}
+export async function updateSkill(id: number, data: Partial<InsertSkill>) {
+  await (await db()).update(skills).set(data).where(eq(skills.id, id));
+  return getSkill(id);
+}
+export async function deleteSkill(id: number) {
+  await (await db()).delete(skills).where(eq(skills.id, id));
+}
+
 /* -------------------------- Credentials --------------------------- */
 export async function listCredentials() {
   return (await db()).select().from(credentials).orderBy(desc(credentials.createdAt));
@@ -235,6 +283,156 @@ export async function updateCredential(id: number, data: Partial<InsertCredentia
 }
 export async function deleteCredential(id: number) {
   await (await db()).delete(credentials).where(eq(credentials.id, id));
+}
+
+/* -------------------------- Custom models ------------------------- */
+export async function listCustomModels() {
+  return (await db()).select().from(customModels).orderBy(customModels.displayName);
+}
+export async function getCustomModel(id: number) {
+  const r = await (await db()).select().from(customModels).where(eq(customModels.id, id)).limit(1);
+  return r[0];
+}
+export async function getCustomModelByModelId(modelId: string) {
+  const r = await (await db()).select().from(customModels).where(eq(customModels.modelId, modelId)).limit(1);
+  return r[0];
+}
+export async function createCustomModel(data: InsertCustomModel) {
+  const d = await db();
+  const r = await d.insert(customModels).values(data).$returningId();
+  return getCustomModel(r[0].id);
+}
+export async function deleteCustomModel(id: number) {
+  await (await db()).delete(customModels).where(eq(customModels.id, id));
+}
+
+/* ------------------------ Agent schedules ------------------------- */
+export async function listSchedulesForAgent(agentId: number) {
+  return (await db())
+    .select()
+    .from(agentSchedules)
+    .where(eq(agentSchedules.agentId, agentId))
+    .orderBy(desc(agentSchedules.createdAt));
+}
+export async function getAgentSchedule(id: number) {
+  const r = await (await db()).select().from(agentSchedules).where(eq(agentSchedules.id, id)).limit(1);
+  return r[0];
+}
+export async function createAgentSchedule(data: InsertAgentSchedule) {
+  const d = await db();
+  const r = await d.insert(agentSchedules).values(data).$returningId();
+  return getAgentSchedule(r[0].id);
+}
+export async function updateAgentSchedule(id: number, data: Partial<InsertAgentSchedule>) {
+  await (await db()).update(agentSchedules).set(data).where(eq(agentSchedules.id, id));
+  return getAgentSchedule(id);
+}
+export async function deleteAgentSchedule(id: number) {
+  await (await db()).delete(agentSchedules).where(eq(agentSchedules.id, id));
+}
+export async function listEnabledSchedules() {
+  const d = await db();
+  return d
+    .select({
+      schedule: agentSchedules,
+      agent: agents,
+    })
+    .from(agentSchedules)
+    .innerJoin(agents, eq(agentSchedules.agentId, agents.id))
+    .where(
+      and(
+        eq(agentSchedules.enabled, true),
+        eq(agents.status, "active"),
+        eq(agents.triggersPaused, false)
+      )
+    );
+}
+
+/* ------------------------- Agent channels ------------------------- */
+export async function listChannelsForAgent(agentId: number) {
+  return (await db()).select().from(agentChannels).where(eq(agentChannels.agentId, agentId));
+}
+export async function getAgentChannel(id: number) {
+  const r = await (await db()).select().from(agentChannels).where(eq(agentChannels.id, id)).limit(1);
+  return r[0];
+}
+export async function getAgentChannelByType(agentId: number, type: AgentChannel["type"]) {
+  const r = await (await db())
+    .select()
+    .from(agentChannels)
+    .where(and(eq(agentChannels.agentId, agentId), eq(agentChannels.type, type)))
+    .limit(1);
+  return r[0];
+}
+export async function upsertAgentChannel(data: InsertAgentChannel) {
+  const d = await db();
+  const existing = await getAgentChannelByType(data.agentId, data.type);
+  if (existing) {
+    await d
+      .update(agentChannels)
+      .set({ enabled: data.enabled, config: data.config ?? null })
+      .where(eq(agentChannels.id, existing.id));
+    return getAgentChannel(existing.id);
+  }
+  const r = await d.insert(agentChannels).values(data).$returningId();
+  return getAgentChannel(r[0].id);
+}
+export async function deleteAgentChannel(id: number) {
+  await (await db()).delete(agentChannels).where(eq(agentChannels.id, id));
+}
+
+/* --------------------------- Chat threads ------------------------- */
+export async function listThreadsForAgent(agentId: number, userId?: number) {
+  const d = await db();
+  const conds = [eq(chatThreads.agentId, agentId)];
+  if (userId !== undefined) conds.push(eq(chatThreads.userId, userId));
+  return d
+    .select()
+    .from(chatThreads)
+    .where(and(...conds))
+    .orderBy(desc(chatThreads.lastMessageAt));
+}
+export async function getChatThread(id: number) {
+  const r = await (await db()).select().from(chatThreads).where(eq(chatThreads.id, id)).limit(1);
+  return r[0];
+}
+export async function getLatestThreadForUserAgent(agentId: number, userId: number) {
+  const r = await (await db())
+    .select()
+    .from(chatThreads)
+    .where(and(eq(chatThreads.agentId, agentId), eq(chatThreads.userId, userId)))
+    .orderBy(desc(chatThreads.lastMessageAt))
+    .limit(1);
+  return r[0];
+}
+export async function createChatThread(data: InsertChatThread) {
+  const d = await db();
+  const r = await d.insert(chatThreads).values(data).$returningId();
+  return getChatThread(r[0].id);
+}
+export async function updateChatThread(id: number, data: Partial<InsertChatThread>) {
+  await (await db()).update(chatThreads).set(data).where(eq(chatThreads.id, id));
+  return getChatThread(id);
+}
+
+/* --------------------------- Chat messages ------------------------ */
+export async function listMessagesForThread(threadId: number) {
+  return (await db())
+    .select()
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId))
+    .orderBy(chatMessages.createdAt);
+}
+export async function createChatMessage(data: InsertChatMessage) {
+  const d = await db();
+  const r = await d.insert(chatMessages).values(data).$returningId();
+  const rows = await d.select().from(chatMessages).where(eq(chatMessages.id, r[0].id)).limit(1);
+  const msg = rows[0];
+  await d
+    .update(chatThreads)
+    .set({ lastMessageAt: msg.createdAt })
+    .where(eq(chatThreads.id, data.threadId));
+  return msg;
 }
 
 /* ----------------------------- Shares ----------------------------- */
@@ -448,6 +646,3 @@ export async function analyticsTokensPerAgent() {
     runs: Number(r.runs),
   }));
 }
-
-// re-export types used in this file's signatures
-import type { Run, Approval } from "../drizzle/schema";

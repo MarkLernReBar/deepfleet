@@ -14,13 +14,16 @@ import Runs from "./pages/Runs";
 import RunTrace from "./pages/RunTrace";
 import Inbox from "./pages/Inbox";
 import Tools from "./pages/Tools";
+import Skills from "./pages/Skills";
 import Credentials from "./pages/Credentials";
+import Chat from "./pages/Chat";
 
 function Router() {
   return (
     <Shell>
       <Switch>
         <Route path="/" component={Overview} />
+        <Route path="/chat" component={Chat} />
         <Route path="/fleets" component={Fleets} />
         <Route path="/agents" component={Agents} />
         <Route path="/agents/new" component={AgentBuilder} />
@@ -30,6 +33,7 @@ function Router() {
         <Route path="/runs/:id" component={RunTrace} />
         <Route path="/inbox" component={Inbox} />
         <Route path="/tools" component={Tools} />
+        <Route path="/skills" component={Skills} />
         <Route path="/credentials" component={Credentials} />
         <Route component={NotFound} />
       </Switch>

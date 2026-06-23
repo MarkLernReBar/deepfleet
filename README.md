@@ -10,7 +10,7 @@ See [DESIGN.md](./DESIGN.md) for the product spec and feature map.
 deepfleet/
 ├── client/                 React + Vite frontend (brutalist UI)
 │   └── src/
-│       ├── pages/          Overview, Agents, Runs, Inbox, Tools, …
+│       ├── pages/          Chat, Overview, Agents, Runs, Inbox, Skills, …
 │       ├── components/     Shell, brutal design system, shadcn/ui
 │       └── lib/            tRPC client, SSE run stream helper
 ├── server/                 Express + tRPC backend
@@ -36,7 +36,7 @@ Requires Node 22+, pnpm, and a MySQL-compatible database.
 ```bash
 pnpm install
 cp .env.example .env        # fill DATABASE_URL, JWT_SECRET, OAuth, LLM keys
-pnpm db:push                # apply schema
+pnpm db:push                # sync schema (or: npx drizzle-kit migrate)
 pnpm dev                    # http://localhost:3000
 ```
 
@@ -53,7 +53,15 @@ For real `create_deep_agent()` runs instead of the built-in TypeScript engine, s
 | `pnpm start` | Run production server |
 | `pnpm check` | TypeScript check |
 | `pnpm test` | Vitest (server tests) |
-| `pnpm db:push` | Generate + apply Drizzle migrations |
+| `pnpm db:push` | Sync schema via Drizzle (`generate` + `migrate`) |
+
+## Fleet parity (Phases 1–2)
+
+Phase 1: subagent model/tools UI, workspace skills, custom model registry, AGENTS.md memory.
+
+Phase 2: cron schedules + pause triggers, channels (chat/Slack/Gmail stubs), threaded chat at `/chat`.
+
+Plan docs: [docs/plans/fleet-parity-phase-1.md](./docs/plans/fleet-parity-phase-1.md), [docs/plans/fleet-parity-phase-2.md](./docs/plans/fleet-parity-phase-2.md).
 
 ## Environment
 

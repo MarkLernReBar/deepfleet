@@ -2,9 +2,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import * as db from "./db";
+import { isValidSkillSlug } from "./skills";
+import { isValidModelId } from "./customModels";
 import { generateAgentCode } from "./codeExport";
 import { SHARE_ROLES } from "../shared/catalog";
 import { isWorkerConfigured, workerHealthy } from "./workerBridge";
+import { createAndExecuteRun } from "./agentRun";
 
 const harnessSchema = z.object({
   planning: z.boolean(),
@@ -21,6 +24,11 @@ const subagentInput = z.object({
   model: z.string().optional(),
   tools: z.array(z.string()).optional().default([]),
 });
+
+const skillSlugSchema = z
+  .string()
+  .min(1)
+  .refine(isValidSkillSlug, { message: "Slug must be lowercase alphanumeric with hyphens only" });
 
 export const fleetRouter = router({
   /* --------------------------- Run engine --------------------------- */
@@ -86,6 +94,8 @@ export const fleetRouter = router({
           harness: harnessSchema.optional(),
           skills: z.array(z.string()).optional(),
           memory: z.array(z.string()).optional(),
+          memoryContent: z.string().nullable().optional(),
+          memoryApprovalRequired: z.boolean().optional(),
           credentialId: z.number().nullable().optional(),
           toolIds: z.array(z.number()).optional().default([]),
           subagents: z.array(subagentInput).optional().default([]),
@@ -104,6 +114,8 @@ export const fleetRouter = router({
           harness: input.harness,
           skills: input.skills,
           memory: input.memory,
+          memoryContent: input.memoryContent ?? null,
+          memoryApprovalRequired: input.memoryApprovalRequired,
           credentialId: input.credentialId ?? null,
           createdBy: ctx.user.id,
         });
@@ -128,7 +140,10 @@ export const fleetRouter = router({
           harness: harnessSchema.optional(),
           skills: z.array(z.string()).optional(),
           memory: z.array(z.string()).optional(),
+          memoryContent: z.string().nullable().optional(),
+          memoryApprovalRequired: z.boolean().optional(),
           credentialId: z.number().nullable().optional(),
+          triggersPaused: z.boolean().optional(),
           toolIds: z.array(z.number()).optional(),
           subagents: z.array(subagentInput).optional(),
         })
@@ -161,6 +176,8 @@ export const fleetRouter = router({
         harness: src.harness,
         skills: src.skills,
         memory: src.memory,
+        memoryContent: src.memoryContent,
+        memoryApprovalRequired: src.memoryApprovalRequired,
         createdBy: ctx.user.id,
       });
       if (!agent) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -234,6 +251,62 @@ export const fleetRouter = router({
     }),
   }),
 
+  /* ----------------------------- Skills ----------------------------- */
+  skills: router({
+    list: protectedProcedure.query(() => db.listSkills()),
+    get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+      const skill = await db.getSkill(input.id);
+      if (!skill) throw new TRPCError({ code: "NOT_FOUND" });
+      return skill;
+    }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          slug: skillSlugSchema,
+          name: z.string().min(1),
+          description: z.string().optional(),
+          content: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getSkillBySlug(input.slug);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+        return db.createSkill({
+          slug: input.slug,
+          name: input.name,
+          description: input.description,
+          content: input.content,
+          createdBy: ctx.user.id,
+        });
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          slug: skillSlugSchema.optional(),
+          name: z.string().min(1).optional(),
+          description: z.string().optional(),
+          content: z.string().min(1).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, slug, ...rest } = input;
+        if (slug) {
+          const existing = await db.getSkillBySlug(slug);
+          if (existing && existing.id !== id) {
+            throw new TRPCError({ code: "CONFLICT", message: "Slug already in use" });
+          }
+        }
+        const skill = await db.updateSkill(id, { ...rest, ...(slug ? { slug } : {}) });
+        if (!skill) throw new TRPCError({ code: "NOT_FOUND" });
+        return skill;
+      }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteSkill(input.id);
+      return { success: true };
+    }),
+  }),
+
   /* -------------------------- Credentials --------------------------- */
   credentials: router({
     list: protectedProcedure.query(async () => {
@@ -266,6 +339,37 @@ export const fleetRouter = router({
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteCredential(input.id);
+      return { success: true };
+    }),
+  }),
+
+  /* ------------------------- Custom models -------------------------- */
+  customModels: router({
+    list: protectedProcedure.query(() => db.listCustomModels()),
+    create: protectedProcedure
+      .input(
+        z.object({
+          modelId: z.string().refine(isValidModelId, { message: "modelId is required" }),
+          displayName: z.string().min(1),
+          baseUrl: z.string().url(),
+          apiKeyEnvVar: z.string().min(1),
+          provider: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getCustomModelByModelId(input.modelId.trim());
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "modelId already registered" });
+        return db.createCustomModel({
+          modelId: input.modelId.trim(),
+          displayName: input.displayName,
+          baseUrl: input.baseUrl,
+          apiKeyEnvVar: input.apiKeyEnvVar,
+          provider: input.provider,
+          createdBy: ctx.user.id,
+        });
+      }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteCustomModel(input.id);
       return { success: true };
     }),
   }),
@@ -334,6 +438,142 @@ export const fleetRouter = router({
       db.analyticsRunsTimeseries(input?.days ?? 14)
     ),
     tokensPerAgent: protectedProcedure.query(() => db.analyticsTokensPerAgent()),
+  }),
+
+  /* --------------------------- Schedules ---------------------------- */
+  schedules: router({
+    list: protectedProcedure.input(z.object({ agentId: z.number() })).query(({ input }) =>
+      db.listSchedulesForAgent(input.agentId)
+    ),
+    create: protectedProcedure
+      .input(
+        z.object({
+          agentId: z.number(),
+          name: z.string().min(1),
+          description: z.string().optional(),
+          cronExpression: z.string().min(1).max(120),
+          prompt: z.string().min(1),
+          enabled: z.boolean().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        db.createAgentSchedule({
+          agentId: input.agentId,
+          name: input.name,
+          description: input.description,
+          cronExpression: input.cronExpression,
+          prompt: input.prompt,
+          enabled: input.enabled ?? true,
+          createdBy: ctx.user.id,
+        })
+      ),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).optional(),
+          description: z.string().optional(),
+          cronExpression: z.string().min(1).max(120).optional(),
+          prompt: z.string().min(1).optional(),
+          enabled: z.boolean().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const { id, ...rest } = input;
+        return db.updateAgentSchedule(id, rest);
+      }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteAgentSchedule(input.id);
+      return { success: true };
+    }),
+  }),
+
+  /* ---------------------------- Channels ---------------------------- */
+  channels: router({
+    list: protectedProcedure.input(z.object({ agentId: z.number() })).query(({ input }) =>
+      db.listChannelsForAgent(input.agentId)
+    ),
+    upsert: protectedProcedure
+      .input(
+        z.object({
+          agentId: z.number(),
+          type: z.enum(["chat", "slack", "gmail"]),
+          enabled: z.boolean(),
+          config: z.record(z.string(), z.unknown()).nullable().optional(),
+        })
+      )
+      .mutation(({ input }) =>
+        db.upsertAgentChannel({
+          agentId: input.agentId,
+          type: input.type,
+          enabled: input.enabled,
+          config: input.config ?? null,
+        })
+      ),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteAgentChannel(input.id);
+      return { success: true };
+    }),
+  }),
+
+  /* ------------------------------- Chat ----------------------------- */
+  chat: router({
+    threads: router({
+      list: protectedProcedure.input(z.object({ agentId: z.number() })).query(({ ctx, input }) =>
+        db.listThreadsForAgent(input.agentId, ctx.user.id)
+      ),
+      create: protectedProcedure
+        .input(z.object({ agentId: z.number(), title: z.string().optional() }))
+        .mutation(({ ctx, input }) =>
+          db.createChatThread({
+            agentId: input.agentId,
+            userId: ctx.user.id,
+            title: input.title?.trim() || "New chat",
+          })
+        ),
+      markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+        const thread = await db.getChatThread(input.id);
+        if (!thread || thread.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+        return db.updateChatThread(input.id, { isRead: true });
+      }),
+      setAttention: protectedProcedure
+        .input(z.object({ id: z.number(), needsAttention: z.boolean() }))
+        .mutation(async ({ ctx, input }) => {
+          const thread = await db.getChatThread(input.id);
+          if (!thread || thread.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+          return db.updateChatThread(input.id, { needsAttention: input.needsAttention });
+        }),
+    }),
+    messages: router({
+      list: protectedProcedure.input(z.object({ threadId: z.number() })).query(async ({ ctx, input }) => {
+        const thread = await db.getChatThread(input.threadId);
+        if (!thread || thread.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+        return db.listMessagesForThread(input.threadId);
+      }),
+      send: protectedProcedure
+        .input(z.object({ threadId: z.number(), content: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          const thread = await db.getChatThread(input.threadId);
+          if (!thread || thread.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+
+          const userMessage = await db.createChatMessage({
+            threadId: input.threadId,
+            role: "user",
+            content: input.content.trim(),
+          });
+          await db.updateChatThread(input.threadId, { isRead: true, needsAttention: false });
+
+          const { runId, output } = await createAndExecuteRun(thread.agentId, input.content, ctx.user.id);
+          const assistantMessage = await db.createChatMessage({
+            threadId: input.threadId,
+            role: "assistant",
+            content: output || "(No response)",
+            runId,
+          });
+
+          return { runId, userMessage, assistantMessage };
+        }),
+    }),
   }),
 
   /* ------------------------------ Users ----------------------------- */

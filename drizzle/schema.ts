@@ -75,9 +75,13 @@ export const agents = mysqlTable(
     harness: json("harness").$type<HarnessOptions>(),
     // list of skill names (on-demand knowledge)
     skills: json("skills").$type<string[]>(),
-    // AGENTS.md memory entries
+    // AGENTS.md memory entries (legacy list; prefer memoryContent)
     memory: json("memory").$type<string[]>(),
+    // AGENTS.md body persisted for the Memory workspace tab
+    memoryContent: text("memoryContent"),
+    memoryApprovalRequired: boolean("memoryApprovalRequired").default(true).notNull(),
     credentialId: int("credentialId"),
+    triggersPaused: boolean("triggersPaused").default(false).notNull(),
     createdBy: int("createdBy").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -121,6 +125,23 @@ export const tools = mysqlTable("tools", {
 
 export type Tool = typeof tools.$inferSelect;
 export type InsertTool = typeof tools.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Skills — workspace SKILL.md catalog                                 */
+/* ------------------------------------------------------------------ */
+export const skills = mysqlTable("skills", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Skill = typeof skills.$inferSelect;
+export type InsertSkill = typeof skills.$inferInsert;
 
 /* ------------------------------------------------------------------ */
 /* AgentTool — which tools an agent has, with per-agent approval flag   */
@@ -321,3 +342,112 @@ export const approvals = mysqlTable(
 
 export type Approval = typeof approvals.$inferSelect;
 export type InsertApproval = typeof approvals.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Custom models — workspace-registered LLM endpoints                  */
+/* ------------------------------------------------------------------ */
+export const customModels = mysqlTable(
+  "customModels",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    // id passed to the LLM API, e.g. deepseek/deepseek-v4-pro
+    modelId: varchar("modelId", { length: 160 }).notNull().unique(),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    baseUrl: varchar("baseUrl", { length: 512 }).notNull(),
+    // name of env var holding the API key — never store the secret itself
+    apiKeyEnvVar: varchar("apiKeyEnvVar", { length: 120 }).notNull(),
+    provider: varchar("provider", { length: 80 }).notNull(),
+    createdBy: int("createdBy").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({ creatorIdx: index("custommodels_creator_idx").on(t.createdBy) })
+);
+
+export type CustomModel = typeof customModels.$inferSelect;
+export type InsertCustomModel = typeof customModels.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Agent schedules — cron-triggered prompts                            */
+/* ------------------------------------------------------------------ */
+export const agentSchedules = mysqlTable(
+  "agentSchedules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    agentId: int("agentId").notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
+    cronExpression: varchar("cronExpression", { length: 120 }).notNull(),
+    prompt: text("prompt").notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    lastRunAt: timestamp("lastRunAt"),
+    createdBy: int("createdBy").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({ agentIdx: index("agentschedules_agent_idx").on(t.agentId) })
+);
+
+export type AgentSchedule = typeof agentSchedules.$inferSelect;
+export type InsertAgentSchedule = typeof agentSchedules.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Agent channels — chat, slack, gmail integrations                    */
+/* ------------------------------------------------------------------ */
+export const agentChannels = mysqlTable(
+  "agentChannels",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    agentId: int("agentId").notNull(),
+    type: mysqlEnum("type", ["chat", "slack", "gmail"]).notNull(),
+    enabled: boolean("enabled").default(false).notNull(),
+    config: json("config").$type<Record<string, unknown>>(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => ({
+    agentTypeIdx: index("agentchannels_agent_type_idx").on(t.agentId, t.type),
+  })
+);
+
+export type AgentChannel = typeof agentChannels.$inferSelect;
+export type InsertAgentChannel = typeof agentChannels.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Chat threads & messages — in-app agent chat                         */
+/* ------------------------------------------------------------------ */
+export const chatThreads = mysqlTable(
+  "chatThreads",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    agentId: int("agentId").notNull(),
+    userId: int("userId").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    needsAttention: boolean("needsAttention").default(false).notNull(),
+    isRead: boolean("isRead").default(true).notNull(),
+    lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index("chatthreads_agent_idx").on(t.agentId),
+    userIdx: index("chatthreads_user_idx").on(t.userId),
+  })
+);
+
+export type ChatThread = typeof chatThreads.$inferSelect;
+export type InsertChatThread = typeof chatThreads.$inferInsert;
+
+export const chatMessages = mysqlTable(
+  "chatMessages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    threadId: int("threadId").notNull(),
+    role: mysqlEnum("role", ["user", "assistant", "system"]).notNull(),
+    content: text("content").notNull(),
+    runId: int("runId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => ({ threadIdx: index("chatmessages_thread_idx").on(t.threadId) })
+);
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;

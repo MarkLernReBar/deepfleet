@@ -35,6 +35,9 @@ class AgentSpec:
     subagents: list[SubagentSpec] = field(default_factory=list)
     harness: dict[str, bool] = field(default_factory=dict)
     skills: list[str] = field(default_factory=list)
+    memory_content: str = ""
+    memory_approval_required: bool = True
+    custom_model_config: dict[str, str] | None = None
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> "AgentSpec":
@@ -48,6 +51,11 @@ class AgentSpec:
             )
             for s in (data.get("subagents") or [])
         ]
+        raw_custom = data.get("custom_model_config")
+        custom_model_config = dict(raw_custom) if isinstance(raw_custom, dict) else None
+        harness = dict(data.get("harness") or {})
+        memory_content = data.get("memory_content", "") or ""
+        memory_approval_required = bool(data.get("memory_approval_required", True))
         return cls(
             name=data.get("name", "agent"),
             model=data["model"],
@@ -55,8 +63,11 @@ class AgentSpec:
             tools=list(data.get("tools") or []),
             approval_tools=list(data.get("approval_tools") or []),
             subagents=subs,
-            harness=dict(data.get("harness") or {}),
+            harness=harness,
             skills=list(data.get("skills") or []),
+            memory_content=memory_content if harness.get("memory") else "",
+            memory_approval_required=memory_approval_required,
+            custom_model_config=custom_model_config,
         )
 
 
@@ -85,9 +96,13 @@ def build_agent(spec: AgentSpec):
     """
     tools = resolve_tools(spec.tools)
 
+    system_prompt = spec.system_prompt
+    if spec.memory_content:
+        system_prompt = f"{system_prompt}\n\n## Agent memory (AGENTS.md)\n{spec.memory_content}".strip()
+
     kwargs: dict[str, Any] = {
-        "model": resolve_model(spec.model),
-        "system_prompt": spec.system_prompt,
+        "model": resolve_model(spec.model, spec.custom_model_config),
+        "system_prompt": system_prompt,
         "tools": tools,
     }
 
@@ -96,8 +111,13 @@ def build_agent(spec: AgentSpec):
 
     # Human-in-the-loop: deepagents pauses (interrupts) before executing any tool
     # listed in interrupt_on. DeepFleet marks these as requires_approval tools.
+    interrupt_on: dict[str, bool] = {}
     if spec.approval_tools:
-        kwargs["interrupt_on"] = {name: True for name in spec.approval_tools}
+        interrupt_on = {name: True for name in spec.approval_tools}
+    if spec.harness.get("memory") and spec.memory_approval_required:
+        interrupt_on["write_file"] = True
+    if interrupt_on:
+        kwargs["interrupt_on"] = interrupt_on
 
     # The deepagents harness already includes planning (write_todos) and a virtual
     # filesystem by default. Newer versions accept a `builtin_tools` allow-list to

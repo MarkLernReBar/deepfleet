@@ -4,9 +4,16 @@ import { useLocation, useRoute, useSearch } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   MODEL_PROVIDERS,
   MODELS_BY_PROVIDER,
@@ -29,6 +36,8 @@ export default function AgentBuilder() {
 
   const { data: fleets } = trpc.fleet.fleets.list.useQuery();
   const { data: tools } = trpc.fleet.tools.list.useQuery({ onlyAvailable: true });
+  const { data: workspaceSkills } = trpc.fleet.skills.list.useQuery();
+  const { data: workspaceModels } = trpc.fleet.customModels.list.useQuery();
   const { data: existing } = trpc.fleet.agents.get.useQuery(
     { id: editId! },
     { enabled: editId !== null }
@@ -42,11 +51,20 @@ export default function AgentBuilder() {
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState("gpt-5");
   const [customModel, setCustomModel] = useState("");
+  const [selectedWorkspaceModelId, setSelectedWorkspaceModelId] = useState<number | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [regModelId, setRegModelId] = useState("");
+  const [regDisplayName, setRegDisplayName] = useState("");
+  const [regBaseUrl, setRegBaseUrl] = useState("");
+  const [regApiKeyEnvVar, setRegApiKeyEnvVar] = useState("");
+  const [regProvider, setRegProvider] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [toolIds, setToolIds] = useState<number[]>([]);
   const [subagents, setSubagents] = useState<SubAgentDraft[]>([]);
   const [harness, setHarness] = useState({ ...HARNESS_DEFAULTS });
-  const [skills, setSkills] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [memoryContent, setMemoryContent] = useState("");
+  const [memoryApprovalRequired, setMemoryApprovalRequired] = useState(true);
 
   // hydrate on edit
   useEffect(() => {
@@ -57,7 +75,14 @@ export default function AgentBuilder() {
     setDescription(a.description ?? "");
     setIdentityType(a.identityType);
     setProvider(a.modelProvider as ModelProvider);
-    setModel(a.model);
+    if (a.modelProvider === "custom") {
+      setCustomModel(a.model);
+      setModel("");
+    } else {
+      setModel(a.model);
+      setCustomModel("");
+    }
+    setSelectedWorkspaceModelId(null);
     setSystemPrompt(a.systemPrompt ?? "");
     setToolIds(existing.tools.map((t) => t.toolId));
     setSubagents(
@@ -70,8 +95,17 @@ export default function AgentBuilder() {
       }))
     );
     setHarness({ ...HARNESS_DEFAULTS, ...(a.harness ?? {}) });
-    setSkills(((a.skills as string[]) ?? []).join(", "));
+    setSkills((a.skills as string[]) ?? []);
+    setMemoryContent(a.memoryContent ?? "");
+    setMemoryApprovalRequired(a.memoryApprovalRequired ?? true);
   }, [existing]);
+
+  // Match workspace model selection when editing a custom-model agent
+  useEffect(() => {
+    if (!existing || existing.agent.modelProvider !== "custom" || !workspaceModels) return;
+    const match = workspaceModels.find((m) => m.modelId === existing.agent.model);
+    if (match) setSelectedWorkspaceModelId(match.id);
+  }, [existing, workspaceModels]);
 
   // default fleet
   useEffect(() => {
@@ -88,8 +122,74 @@ export default function AgentBuilder() {
     onSuccess: () => { utils.fleet.invalidate(); toast.success("Agent updated"); navigate(`/agents/${editId}`); },
     onError: (e) => toast.error(e.message),
   });
+  const registerModelM = trpc.fleet.customModels.create.useMutation({
+    onSuccess: (m) => {
+      utils.fleet.customModels.list.invalidate();
+      setRegisterOpen(false);
+      setRegModelId("");
+      setRegDisplayName("");
+      setRegBaseUrl("");
+      setRegApiKeyEnvVar("");
+      setRegProvider("");
+      if (m) {
+        setProvider("custom");
+        setCustomModel(m.modelId);
+        setSelectedWorkspaceModelId(m.id);
+      }
+      toast.success("Model registered");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const selectCatalogModel = (p: ModelProvider, m: string) => {
+    setProvider(p);
+    setModel(m);
+    setCustomModel("");
+    setSelectedWorkspaceModelId(null);
+  };
+
+  const selectWorkspaceModel = (cm: { id: number; modelId: string }) => {
+    setProvider("custom");
+    setCustomModel(cm.modelId);
+    setSelectedWorkspaceModelId(cm.id);
+  };
+
+  const resetRegisterForm = () => {
+    setRegModelId("");
+    setRegDisplayName("");
+    setRegBaseUrl("");
+    setRegApiKeyEnvVar("");
+    setRegProvider("");
+  };
+
+  const submitRegisterModel = () => {
+    if (!regModelId.trim()) return toast.error("Model id is required");
+    if (!regDisplayName.trim()) return toast.error("Display name is required");
+    if (!regBaseUrl.trim()) return toast.error("Base URL is required");
+    if (!regApiKeyEnvVar.trim()) return toast.error("API key env var is required");
+    if (!regProvider.trim()) return toast.error("Provider is required");
+    registerModelM.mutate({
+      modelId: regModelId.trim(),
+      displayName: regDisplayName.trim(),
+      baseUrl: regBaseUrl.trim(),
+      apiKeyEnvVar: regApiKeyEnvVar.trim(),
+      provider: regProvider.trim(),
+    });
+  };
 
   const toggleTool = (id: number) => setToolIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  const toggleSkill = (slug: string) =>
+    setSkills((p) => (p.includes(slug) ? p.filter((x) => x !== slug) : [...p, slug]));
+
+  const toggleSubagentTool = (index: number, slug: string) =>
+    setSubagents((p) =>
+      p.map((s, j) =>
+        j === index
+          ? { ...s, tools: s.tools.includes(slug) ? s.tools.filter((x) => x !== slug) : [...s.tools, slug] }
+          : s
+      )
+    );
 
   const submit = () => {
     if (!fleetId) return toast.error("Select a fleet");
@@ -104,7 +204,9 @@ export default function AgentBuilder() {
       model: effectiveModel,
       systemPrompt,
       harness,
-      skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
+      skills,
+      memoryContent: harness.memory ? memoryContent.trim() || null : null,
+      memoryApprovalRequired: harness.memory ? memoryApprovalRequired : undefined,
       toolIds,
       subagents: subagents.filter((s) => s.name.trim()),
     };
@@ -195,33 +297,95 @@ export default function AgentBuilder() {
             <div>
               <Eyebrow className="mb-2">Provider</Eyebrow>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {MODEL_PROVIDERS.map((p) => (
+                {MODEL_PROVIDERS.filter((p) => p.id !== "custom").map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => { setProvider(p.id); if (p.id !== "custom") setModel(MODELS_BY_PROVIDER[p.id][0] ?? ""); }}
-                    className={cn("press border-2 p-3 text-center", provider === p.id ? "border-foreground bg-foreground text-background" : "border-input")}
+                    onClick={() => {
+                      setProvider(p.id);
+                      setModel(MODELS_BY_PROVIDER[p.id][0] ?? "");
+                      setCustomModel("");
+                      setSelectedWorkspaceModelId(null);
+                    }}
+                    className={cn(
+                      "press border-2 p-3 text-center",
+                      provider !== "custom" && provider === p.id ? "border-foreground bg-foreground text-background" : "border-input"
+                    )}
                   >
                     <span className="mono-label">{p.label}</span>
                   </button>
                 ))}
               </div>
             </div>
-            {provider === "custom" ? (
-              <div>
-                <Eyebrow className="mb-1.5">Custom model id</Eyebrow>
-                <Input value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder="my-org/my-model" className="border-2 border-foreground font-mono" />
-                <p className="mt-2 text-xs text-muted-foreground">The provider prefix in the export will be <span className="font-mono">custom:</span>.</p>
-              </div>
-            ) : (
+            {provider !== "custom" && (
               <div>
                 <Eyebrow className="mb-2">Model</Eyebrow>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {models.map((m) => (
-                    <button key={m} onClick={() => setModel(m)} className={cn("press border-2 px-4 py-3 text-left font-mono text-sm", model === m ? "border-foreground bg-muted" : "border-input")}>
+                    <button
+                      key={m}
+                      onClick={() => selectCatalogModel(provider, m)}
+                      className={cn(
+                        "press border-2 px-4 py-3 text-left font-mono text-sm",
+                        model === m && selectedWorkspaceModelId === null ? "border-foreground bg-muted" : "border-input"
+                      )}
+                    >
                       {m}
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <Eyebrow>Workspace models</Eyebrow>
+                <button
+                  onClick={() => setRegisterOpen(true)}
+                  className="press inline-flex items-center gap-1.5 border-2 border-foreground px-3 py-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> <span className="mono-label">Register model</span>
+                </button>
+              </div>
+              {(workspaceModels?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No workspace models yet. Register an OpenAI-compatible endpoint to use it here.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {workspaceModels!.map((cm) => {
+                    const selected = selectedWorkspaceModelId === cm.id;
+                    return (
+                      <button
+                        key={cm.id}
+                        onClick={() => selectWorkspaceModel(cm)}
+                        className={cn(
+                          "press border-2 p-3 text-left",
+                          selected ? "border-foreground bg-muted" : "border-input"
+                        )}
+                      >
+                        <div className="font-mono text-sm font-semibold">{cm.displayName}</div>
+                        <div className="mt-1 font-mono text-xs text-muted-foreground">{cm.modelId}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="mono-label border border-foreground px-1">{cm.provider}</span>
+                          <span className="mono-label text-muted-foreground">{cm.apiKeyEnvVar}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {provider === "custom" && selectedWorkspaceModelId === null && (
+              <div>
+                <Eyebrow className="mb-1.5">Custom model id</Eyebrow>
+                <Input
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  placeholder="my-org/my-model"
+                  className="border-2 border-foreground font-mono"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Unregistered custom id. The export prefix will be <span className="font-mono">custom:</span>.
+                </p>
               </div>
             )}
           </div>
@@ -296,6 +460,50 @@ export default function AgentBuilder() {
                   <Input value={s.description} onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} placeholder="description" className="border-2 border-foreground" />
                 </div>
                 <Textarea value={s.prompt} onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, prompt: e.target.value } : x)))} placeholder="subagent prompt" rows={3} className="mt-3 border-2 border-foreground font-mono text-sm" />
+                <div className="mt-3">
+                  <Eyebrow className="mb-1.5">Model</Eyebrow>
+                  <Input
+                    value={s.model}
+                    onChange={(e) => setSubagents((p) => p.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)))}
+                    placeholder="Inherit orchestrator model (leave empty)"
+                    className="border-2 border-foreground font-mono"
+                  />
+                </div>
+                <div className="mt-3">
+                  <Eyebrow className="mb-1.5">Tools</Eyebrow>
+                  {(tools?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">No tools available. Add tools in the Tools & MCP catalog.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {tools!.map((t) => {
+                        const on = s.tools.includes(t.slug);
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => toggleSubagentTool(i, t.slug)}
+                            className={cn("press flex items-start gap-3 border-2 p-3 text-left", on ? "border-foreground bg-muted" : "border-input")}
+                          >
+                            <div className={cn("mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border-2 border-foreground", on && "bg-foreground")}>
+                              {on && <Check className="h-3 w-3 text-background" />}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-semibold">{t.slug}</span>
+                                {t.requiresApproval && <span className="mono-label border border-foreground px-1">approval</span>}
+                                {t.type === "mcp" && <span className="mono-label bg-foreground px-1 text-background">mcp</span>}
+                              </div>
+                              <p className="truncate text-xs text-muted-foreground">{t.description}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Leave model empty to use the orchestrator&apos;s model. Tools restrict what this subagent can call.
+                </p>
               </Panel>
             ))}
           </div>
@@ -323,10 +531,57 @@ export default function AgentBuilder() {
                 ))}
               </div>
             </div>
+            {harness.memory && (
+              <div>
+                <Eyebrow className="mb-3">Initial AGENTS.md (optional)</Eyebrow>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Seed persistent memory now, or edit anytime from the agent&apos;s Memory tab after creation.
+                </p>
+                <Textarea
+                  value={memoryContent}
+                  onChange={(e) => setMemoryContent(e.target.value)}
+                  rows={8}
+                  placeholder="# Agent memory&#10;&#10;Context that should persist across runs…"
+                  className="border-2 border-foreground font-mono text-xs"
+                />
+                <label className="mt-3 flex cursor-pointer items-center gap-3">
+                  <Switch checked={memoryApprovalRequired} onCheckedChange={setMemoryApprovalRequired} />
+                  <span className="text-sm">Require approval before memory writes</span>
+                </label>
+              </div>
+            )}
             {harness.skills && (
               <div>
-                <Eyebrow className="mb-1.5">Skills (comma-separated)</Eyebrow>
-                <Input value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="research, citations" className="border-2 border-foreground font-mono" />
+                <Eyebrow className="mb-3">Workspace skills</Eyebrow>
+                {(workspaceSkills?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No workspace skills yet. Create skills on the Skills page to attach them here.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-input border-2 border-foreground">
+                    {workspaceSkills?.map((s) => (
+                      <label
+                        key={s.id}
+                        className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          checked={skills.includes(s.slug)}
+                          onCheckedChange={() => toggleSkill(s.slug)}
+                          className="mt-0.5 border-2 border-foreground"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold">{s.slug}</span>
+                            <span className="text-sm font-semibold">{s.name}</span>
+                          </div>
+                          {s.description && (
+                            <p className="mt-1 text-xs text-muted-foreground">{s.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {selectedFleet && (
@@ -366,6 +621,78 @@ export default function AgentBuilder() {
           )}
         </div>
       </Panel>
+
+      <Dialog open={registerOpen} onOpenChange={(o) => { setRegisterOpen(o); if (!o) resetRegisterForm(); }}>
+        <DialogContent className="border-2 border-foreground">
+          <DialogHeader>
+            <DialogTitle className="display-hero text-2xl">Register model</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Eyebrow className="mb-1.5">Model id</Eyebrow>
+              <Input
+                value={regModelId}
+                onChange={(e) => setRegModelId(e.target.value)}
+                placeholder="deepseek/deepseek-v4-pro"
+                className="border-2 border-foreground font-mono"
+              />
+            </div>
+            <div>
+              <Eyebrow className="mb-1.5">Display name</Eyebrow>
+              <Input
+                value={regDisplayName}
+                onChange={(e) => setRegDisplayName(e.target.value)}
+                placeholder="DeepSeek V4 Pro"
+                className="border-2 border-foreground"
+              />
+            </div>
+            <div>
+              <Eyebrow className="mb-1.5">Base URL</Eyebrow>
+              <Input
+                value={regBaseUrl}
+                onChange={(e) => setRegBaseUrl(e.target.value)}
+                placeholder="https://api.example.com/v1"
+                className="border-2 border-foreground font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Eyebrow className="mb-1.5">API key env var</Eyebrow>
+                <Input
+                  value={regApiKeyEnvVar}
+                  onChange={(e) => setRegApiKeyEnvVar(e.target.value)}
+                  placeholder="DEEPSEEK_API_KEY"
+                  className="border-2 border-foreground font-mono"
+                />
+              </div>
+              <div>
+                <Eyebrow className="mb-1.5">Provider</Eyebrow>
+                <Input
+                  value={regProvider}
+                  onChange={(e) => setRegProvider(e.target.value)}
+                  placeholder="deepseek"
+                  className="border-2 border-foreground font-mono"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Stores the env var name only — the secret must be configured on the server or worker.
+            </p>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setRegisterOpen(false)} className="press border-2 border-foreground px-4 py-2 mono-label">
+              Cancel
+            </button>
+            <button
+              onClick={submitRegisterModel}
+              disabled={registerModelM.isPending}
+              className="press bg-foreground px-4 py-2 text-background mono-label disabled:opacity-50"
+            >
+              Register
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
